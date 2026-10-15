@@ -60,8 +60,26 @@
 
   // Sessions rotate in this order regardless of how many days a week you train.
   // Yoga follows each upper day, so there is always a lighter day before legs.
-  const YOGA = { id: 'yoga', name: 'Yoga', short: 'Yoga', minutes: 60, exercises: [],
-    note: 'Swap poses with deep knee bend (hero, child\'s pose, deep lunge, lotus) for supported or straight-leg versions.' };
+  // Hip flexibility and leg mobility, kept knee-safe: no kneeling on the
+  // kneecap, no deep loaded knee bend, no twisting through a bent knee.
+  // `sides` poses switch legs halfway through.
+  const YOGA_FLOW = [
+    { name: 'Cat-cow', min: 3, cue: 'On hands and knees with padding under the knees. Slow spine waves.' },
+    { name: 'Standing hip flexor stretch', min: 6, sides: true, cue: 'Short split stance, back leg straight, tuck the pelvis and squeeze the back glute.' },
+    { name: 'Pyramid pose', min: 4, sides: true, cue: 'Both legs straight but not locked, hinge over the front leg.' },
+    { name: 'Wide-leg forward fold', min: 4, cue: 'Feet wide, knees soft, hands to blocks or floor.' },
+    { name: 'Tree pose', min: 4, sides: true, cue: 'Standing knee soft, foot on the calf (never the knee).' },
+    { name: 'Bridge holds', min: 4, cue: '30 s holds with short rests. Knees in line with the hips.' },
+    { name: 'Strap hamstring stretch', min: 6, sides: true, cue: 'On your back, strap round the foot, leg straight up.' },
+    { name: 'Reclined figure-four', min: 6, sides: true, cue: 'Ankle over the opposite thigh, hands behind the thigh, not the shin.' },
+    { name: 'Strap leg to the side', min: 4, sides: true, cue: 'On your back, straight leg lowered out to the side for the inner thigh.' },
+    { name: 'Supported butterfly', min: 4, cue: 'On your back, soles together, blocks or cushions under both knees.' },
+    { name: 'Supine twist, top leg straight', min: 4, sides: true, cue: 'Straight top leg across the body; knees never bent and twisted.' },
+    { name: 'Legs up the wall, wide', min: 5, cue: 'Let the legs fall open into a straddle.' },
+    { name: 'Savasana', min: 6, cue: 'Legs long, a cushion under the knees if comfortable.' },
+  ];
+  const YOGA = { id: 'yoga', name: 'Yoga: hips & legs', short: 'Yoga', minutes: 60, exercises: [], flow: YOGA_FLOW,
+    note: 'Avoid hero, child\'s pose, pigeon, lotus and deep lunges.' };
   const ROTATION = [
     { id: 'lower_a', short: 'Legs A', name: 'Lower A: glutes & hamstrings',
       exercises: ['hip_thrust', 'rdl', 'leg_press_shallow', 'leg_curl', 'hip_abduction', 'cable_adduction', 'calf_standing', 'tke'] },
@@ -185,6 +203,7 @@
       name: day.name,
       minutes: day.minutes || null,
       note: day.note || '',
+      flow: day.flow || null,
       deload,
       exercises: day.exercises.map((id) => targetFor(id, state.lifts[id], deload)),
     };

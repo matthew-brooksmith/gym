@@ -118,6 +118,7 @@ test('yoga days are an hour with no lifts, and appear in the upcoming strip', ()
   assert.strictEqual(sess.exercises.length, 0);
   const r = P.completeSession(s, {});
   assert.strictEqual(r.state.sessionCount, 3);
-  assert.strictEqual(r.state.history[0].name, 'Yoga');
+  assert.strictEqual(r.state.history[0].name, 'Yoga: hips & legs');
+  assert.strictEqual(sess.flow.reduce((t, p) => t + p.min, 0), 60);
   assert.deepStrictEqual(P.upcoming(fresh(), 6).map((d) => d.short), ['Legs A', 'Upper A', 'Yoga', 'Legs B', 'Upper B', 'Yoga']);
 });
