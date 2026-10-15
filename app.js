@@ -339,4 +339,9 @@
 
   render();
   connectCloud();
+
+  // Installed-app mode (GitHub Pages): cache the app so it opens offline.
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !window.claude) {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* not installable here */ });
+  }
 })();

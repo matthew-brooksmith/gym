@@ -34,6 +34,15 @@ This is general training guidance; a physio's advice for your knee takes priorit
 
 Exercises, sets, rep ranges, increments and the rotation live at the top of `plan.js`.
 
+## Install on a phone
+
+The app is a Progressive Web App: hosted on GitHub Pages it installs to the home screen, runs full screen and works offline. Data stays on the phone (use Me → Backup to export it).
+
+1. Repo **Settings → Pages**: Source "Deploy from a branch", branch `main`, folder `/ (root)`.
+2. On the phone, open https://matthew-brooksmith.github.io/gym/ in Chrome and tap **Install app** (or ⋮ → Add to Home screen).
+
+After changing app files, bump `CACHE` in `sw.js` so installed copies pick up the new version.
+
 ## Publishing a single-file copy
 
 `node scripts/build-single.js [out.html]` inlines the CSS and JS into one page (no doctype/head, as claude.ai artifacts expect).
