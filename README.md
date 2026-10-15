@@ -26,7 +26,8 @@ Built around patellar instability from shallow trochlear grooves:
 
 - No deep squats, lunges, jumps or pivoting. Loaded knee bend stays at or under about 60°.
 - Quads: shallow-range leg press, low-box step-ups, Spanish squat isometrics.
-- VMO and stability every lower day: banded terminal knee extensions, hip abduction, Copenhagen planks, single-leg balance.
+- VMO and stability every lower day: cable terminal knee extensions, cable hip abduction and adduction, Copenhagen planks, single-leg balance.
+- Cable work: pull-throughs, glute kickbacks, hip abduction/adduction and TKEs, all with the knee held at a fixed angle.
 - Most leg size comes from glutes, hamstrings, adductors and calves, loaded hard with the knee still.
 
 This is general training guidance; a physio's advice for your knee takes priority.
