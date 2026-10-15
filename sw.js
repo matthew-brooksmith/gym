@@ -1,6 +1,6 @@
 // Offline support for the installed app. App files are served from cache and
 // refreshed in the background, so a new version shows up on the next launch.
-const CACHE = 'leg-day-v2';
+const CACHE = 'leg-day-v3';
 const APP_FILES = ['./', 'index.html', 'style.css', 'plan.js', 'app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

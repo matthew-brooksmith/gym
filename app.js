@@ -90,11 +90,7 @@
       const load = last.weight ? `${fmt(last.weight)} kg × ` : '';
       return `<p class="last">Last time, ${esc(dateLabel(last.date))}: <b>${load}${esc(sets)}</b> <span class="${esc(last.change)}">· ${esc(last.message)}</span></p>`;
     }
-    if (ex.loaded && lift.source === 'estimate') {
-      return '<p class="last">No attempt yet. This weight is estimated from your body mass, so treat set 1 as a feeler and adjust.</p>';
-    }
-    if (ex.loaded) return '<p class="last">No attempt yet. Starting from the weight you entered.</p>';
-    return '<p class="last">No attempt yet.</p>';
+    return '';
   }
 
   function exerciseCard(ex, lift, draft) {
@@ -172,8 +168,7 @@
         return `<tr><td>${esc(ex.name)}<br><span class="muted small">${target}</span><div class="lastmini small">Last: ${last}</div></td><td>${next}</td><td class="lastcol">${last}</td></tr>`;
       }).join('');
     }).join('');
-    return `<section class="head"><span class="eyebrow">Next weight for every exercise</span><h1>All lifts</h1>
-        <p class="muted small">Italic weights are estimates from your body mass and update when it changes. Type your real working weight to replace one.</p></section>
+    return `<section class="head"><span class="eyebrow">Next weight for every exercise</span><h1>All lifts</h1></section>
       <section class="panel"><div class="table-wrap"><table>
         <thead><tr><th>Exercise</th><th>Next (kg)</th><th class="lastcol">Last attempt</th></tr></thead>
         <tbody>${rows}</tbody></table></div></section>`;
@@ -221,13 +216,6 @@
       </section>
       <section class="panel"><h2>Hard sets per muscle, per 4-session rotation</h2>${bars}
         <p class="muted small">Legs get the most work. Hypertrophy generally needs about 10–20 hard sets per muscle a week.</p></section>
-      <section class="panel"><h2>How the plan protects your knees</h2><ul>
-        <li>No deep squats, lunges, jumps or pivoting. Loaded knee bend stays at about 60° or less, where the kneecap sits in the groove.</li>
-        <li>Quads grow from shallow leg press, low step-ups and Spanish squat holds, all guided and closed-chain.</li>
-        <li>VMO and stability work every leg day: cable terminal knee extensions, cable hip abduction and adduction, Copenhagen planks, single-leg balance.</li>
-        <li>Most leg size comes from glutes, hamstrings, adductors and calves, loaded hard with the knee still.</li>
-        <li>Stop a set if the kneecap feels like it is shifting. This is general training guidance, and your physio's advice comes first.</li>
-      </ul></section>
       <section class="panel"><h2>History</h2>${hist}</section>
       ${backup}
       <button type="button" class="secondary danger" id="reset">${armed === 'reset' ? 'Tap again to erase everything' : 'Erase all weights and history'}</button>`;
