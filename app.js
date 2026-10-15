@@ -130,7 +130,7 @@
   }
 
   function outcomesPanel() {
-    if (!lastOutcomes) return '';
+    if (!lastOutcomes || !lastOutcomes.length) return '';
     const rows = lastOutcomes.map((o) => {
       const next = o.weight != null ? `${fmt(o.next)} kg` : '';
       return `<li><span>${esc(o.name)}</span><span class="n ${esc(o.change)}">${esc(next || o.message)}</span></li>`;
@@ -138,11 +138,32 @@
     return `<section class="panel flash"><h2>Workout saved. Next time:</h2><ul class="done-list">${rows}</ul></section>`;
   }
 
+  function scheduleStrip() {
+    return `<ol class="strip">${P.upcoming(state, 6).map((d, i) =>
+      `<li class="${d.id === 'yoga' ? 'yoga' : d.id.startsWith('lower') ? 'legs' : 'upper'}${i === 0 ? ' now' : ''}">${esc(d.short)}</li>`).join('')}</ol>`;
+  }
+
+  function renderYoga(s) {
+    return `${scheduleStrip()}
+      <section class="head">
+        <span class="eyebrow">Session ${s.index + 1} · Yoga day</span>
+        <h1>Yoga</h1>
+      </section>
+      <article class="ex">
+        <div class="target"><div class="try"><span class="label">Session</span><span class="kg">${s.minutes}</span><span class="unit">min</span></div></div>
+        <details class="knee"><summary>Notes</summary><p>${esc(s.note)}</p></details>
+        <div class="timer-btns"><button type="button" class="chipbtn" data-countdown="${s.minutes * 60}" data-name="Yoga">Start ${s.minutes}:00 timer</button></div>
+      </article>
+      <button type="button" class="primary" id="finish">Done</button>`;
+  }
+
   function renderToday() {
     const s = P.nextSession(state);
+    if (s.minutes) return outcomesPanel() + renderYoga(s);
     const draft = state.draft && state.draft.index === s.index ? state.draft.log : {};
     const kind = s.id.startsWith('lower') ? 'Leg day' : 'Upper day';
     return `${outcomesPanel()}
+      ${scheduleStrip()}
       <section class="head">
         <span class="eyebrow">Session ${s.index + 1} · ${kind}</span>
         <h1>${esc(s.name)}</h1>
@@ -279,8 +300,8 @@
     } catch (e) { /* no audio */ }
   }
 
-  function startRest(sec, name) {
-    timer = { kind: 'rest', name, end: Date.now() + sec * 1000, alerted: false };
+  function startRest(sec, name, label) {
+    timer = { kind: 'rest', name, label: label || 'Rest', end: Date.now() + sec * 1000, alerted: false };
     runTimer();
   }
   function startHold(exId, min, max) {
@@ -307,7 +328,7 @@
       const done = left <= 0;
       if (done && !timer.alerted) { timer.alerted = true; alertDone(); }
       el.className = done ? 'timer done' : 'timer';
-      el.innerHTML = `<div class="t-main"><span class="t-label">${done ? 'Rest over' : 'Rest'}</span><span class="t-clock">${done ? 'Go' : fmtClock(Math.ceil(left))}</span></div>
+      el.innerHTML = `<div class="t-main"><span class="t-label">${done ? `${timer.label} over` : timer.label}</span><span class="t-clock">${done ? 'Go' : fmtClock(Math.ceil(left))}</span></div>
         <div class="t-btns"><button type="button" data-t="minus">−15</button><button type="button" data-t="plus">+15</button><button type="button" data-t="stop">${done ? 'Close' : 'Skip'}</button></div>`;
     } else {
       const secs = (Date.now() - timer.start) / 1000;
@@ -367,11 +388,13 @@
   view.addEventListener('click', (e) => {
     const t = e.target.closest('button');
     if (!t) return;
+    if (t.dataset.countdown) { startRest(Number(t.dataset.countdown), t.dataset.name, t.dataset.name); return; }
     if (t.dataset.rest) { startRest(Number(t.dataset.rest), t.dataset.name); return; }
     if (t.dataset.hold) { startHold(t.dataset.hold, Number(t.dataset.min), Number(t.dataset.max)); return; }
     if (t.id === 'finish') {
       const log = readDraft();
-      const empty = Object.values(log).every((x) => x.reps.every((v) => v == null));
+      const isYoga = !!P.nextSession(state).minutes;
+      const empty = !isYoga && Object.values(log).every((x) => x.reps.every((v) => v == null));
       if (empty && armed !== 'finish') { armed = 'finish'; t.textContent = 'Nothing logged. Tap again to skip this session'; return; }
       armed = null;
       const res = P.completeSession(state, log);

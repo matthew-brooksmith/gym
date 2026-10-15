@@ -46,7 +46,7 @@ test('unloaded holds progress by seconds', () => {
   const s = fresh();
   const out = P.progress('spanish_squat', s.lifts.spanish_squat, [45, 45, 45, 45]);
   assert.strictEqual(out.lift.bonus, 5);
-  const t = P.nextSession(Object.assign({}, s, { sessionCount: 2, lifts: Object.assign({}, s.lifts, { spanish_squat: out.lift }) }));
+  const t = P.nextSession(Object.assign({}, s, { sessionCount: 3, lifts: Object.assign({}, s.lifts, { spanish_squat: out.lift }) }));
   const sq = t.exercises.find((e) => e.id === 'spanish_squat');
   assert.strictEqual(sq.min, 35);
   assert.strictEqual(sq.max, 50);
@@ -55,19 +55,19 @@ test('unloaded holds progress by seconds', () => {
 test('rotation alternates lower and upper and advances', () => {
   let s = fresh();
   const ids = [];
-  for (let i = 0; i < 5; i++) { ids.push(P.nextSession(s).id); s = P.completeSession(s, {}).state; }
-  assert.deepStrictEqual(ids, ['lower_a', 'upper_a', 'lower_b', 'upper_b', 'lower_a']);
+  for (let i = 0; i < 7; i++) { ids.push(P.nextSession(s).id); s = P.completeSession(s, {}).state; }
+  assert.deepStrictEqual(ids, ['lower_a', 'upper_a', 'yoga', 'lower_b', 'upper_b', 'yoga', 'lower_a']);
 });
 
 test('deload weeks halve sets and do not progress', () => {
   let s = P.setWeight(fresh(), 'hip_thrust', 100);
-  s.sessionCount = 20;
+  s.sessionCount = 30;
   const sess = P.nextSession(s);
   assert.ok(sess.deload);
   assert.strictEqual(sess.exercises[0].sets, 2);
   const r = P.completeSession(s, { hip_thrust: [12, 12] });
   assert.strictEqual(r.state.lifts.hip_thrust.weight, 100);
-  assert.ok(!P.isDeload(24));
+  assert.ok(!P.isDeload(36));
 });
 
 test('legs get more weekly sets than any upper group', () => {
@@ -108,4 +108,16 @@ test('a logged estimate is kept when body mass changes', () => {
   s.profile.bodyMass = 100;
   s = P.syncLifts(s);
   assert.strictEqual(s.lifts.hip_thrust.weight, 75);
+});
+
+test('yoga days are an hour with no lifts, and appear in the upcoming strip', () => {
+  const s = Object.assign(fresh(), { sessionCount: 2 });
+  const sess = P.nextSession(s);
+  assert.strictEqual(sess.id, 'yoga');
+  assert.strictEqual(sess.minutes, 60);
+  assert.strictEqual(sess.exercises.length, 0);
+  const r = P.completeSession(s, {});
+  assert.strictEqual(r.state.sessionCount, 3);
+  assert.strictEqual(r.state.history[0].name, 'Yoga');
+  assert.deepStrictEqual(P.upcoming(fresh(), 6).map((d) => d.short), ['Legs A', 'Upper A', 'Yoga', 'Legs B', 'Upper B', 'Yoga']);
 });
