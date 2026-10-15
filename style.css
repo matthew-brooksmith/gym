@@ -135,6 +135,13 @@ details.hist ul { font-size: 14px; margin-top: 6px; }
 }
 .lastmini { display: none; }
 
+/* Upcoming sessions */
+.strip { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.strip li { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); background: var(--surface); }
+.strip li.legs { border-color: var(--accent); color: var(--accent); }
+.strip li.yoga { border-color: var(--up); color: var(--up); }
+.strip li.now { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
 /* Timers */
 .timer-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .chipbtn { font: 600 14px var(--body); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }

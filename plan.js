@@ -58,22 +58,26 @@
     cable_crunch: { name: 'Cable crunch', group: 'core', sets: 3, min: 10, max: 15, increment: 2.5, ratio: 0.4 },
   };
 
-  // Sessions rotate in this order regardless of how many days a week you train,
-  // so legs get 2 of every 4 sessions.
+  // Sessions rotate in this order regardless of how many days a week you train.
+  // Yoga follows each upper day, so there is always a lighter day before legs.
+  const YOGA = { id: 'yoga', name: 'Yoga', short: 'Yoga', minutes: 60, exercises: [],
+    note: 'Swap poses with deep knee bend (hero, child\'s pose, deep lunge, lotus) for supported or straight-leg versions.' };
   const ROTATION = [
-    { id: 'lower_a', name: 'Lower A: glutes & hamstrings',
+    { id: 'lower_a', short: 'Legs A', name: 'Lower A: glutes & hamstrings',
       exercises: ['hip_thrust', 'rdl', 'leg_press_shallow', 'leg_curl', 'hip_abduction', 'cable_adduction', 'calf_standing', 'tke'] },
-    { id: 'upper_a', name: 'Upper A: horizontal push & pull',
+    { id: 'upper_a', short: 'Upper A', name: 'Upper A: horizontal push & pull',
       exercises: ['bench', 'row', 'ohp', 'pulldown', 'lateral_raise', 'triceps', 'pallof'] },
-    { id: 'lower_b', name: 'Lower B: knee-safe quads & stability',
+    YOGA,
+    { id: 'lower_b', short: 'Legs B', name: 'Lower B: knee-safe quads & stability',
       exercises: ['spanish_squat', 'leg_press_heavy', 'step_up', 'cable_pull_through', 'cable_kickback', 'copenhagen', 'calf_seated', 'tke', 'single_leg_balance'] },
-    { id: 'upper_b', name: 'Upper B: incline, back & arms',
+    { id: 'upper_b', short: 'Upper B', name: 'Upper B: incline, back & arms',
       exercises: ['incline_db', 'cable_row', 'pulldown', 'face_pull', 'curl', 'triceps', 'cable_crunch'] },
+    YOGA,
   ];
 
-  // Every 6th week (24 sessions in, if you train 4x) is a deload: half the sets, same weights.
-  const DELOAD_EVERY = 24;
-  const DELOAD_LENGTH = 4;
+  // Every 6th pass through the rotation is a deload: half the sets, same weights.
+  const DELOAD_EVERY = 36;
+  const DELOAD_LENGTH = 6;
   const STRIKES_TO_DELOAD = 2;
   const DELOAD_FACTOR = 0.9;
   const UNLOADED_STEP = { reps: 2, sec: 5 };
@@ -163,6 +167,15 @@
     return 'Last set to 0–1 reps before failure';
   }
 
+  // The next n sessions from the current one, for the schedule strip.
+  function upcoming(state, n) {
+    return Array.from({ length: n }, (_, i) => {
+      const idx = state.sessionCount + i;
+      const day = ROTATION[idx % ROTATION.length];
+      return { index: idx, id: day.id, short: day.short, deload: isDeload(idx) };
+    });
+  }
+
   function nextSession(state) {
     const day = ROTATION[state.sessionCount % ROTATION.length];
     const deload = isDeload(state.sessionCount);
@@ -170,6 +183,8 @@
       index: state.sessionCount,
       id: day.id,
       name: day.name,
+      minutes: day.minutes || null,
+      note: day.note || '',
       deload,
       exercises: day.exercises.map((id) => targetFor(id, state.lifts[id], deload)),
     };
@@ -287,7 +302,7 @@
     return out;
   }
 
-  const api = { EXERCISES, ROTATION, estimateWeight, defaultState, syncLifts, setWeight, nextSession, progress, completeSession, isDeload, weeklyVolume, nutrition, roundTo };
+  const api = { EXERCISES, ROTATION, estimateWeight, defaultState, syncLifts, setWeight, nextSession, upcoming, progress, completeSession, isDeload, weeklyVolume, nutrition, roundTo };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GymPlan = api;
 })(typeof window !== 'undefined' ? window : globalThis);
