@@ -140,7 +140,7 @@
 
   function scheduleStrip() {
     return `<ol class="strip">${P.upcoming(state, 6).map((d, i) =>
-      `<li class="${d.id === 'yoga' ? 'yoga' : d.id.startsWith('lower') ? 'legs' : 'upper'}${i === 0 ? ' now' : ''}">${esc(d.short)}</li>`).join('')}</ol>`;
+      `<li class="${d.id.startsWith('yoga') ? 'yoga' : d.id.startsWith('lower') ? 'legs' : 'upper'}${i === 0 ? ' now' : ''}">${esc(d.short)}</li>`).join('')}</ol>`;
   }
 
   function renderYoga(s) {
