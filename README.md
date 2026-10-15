@@ -1,4 +1,4 @@
-# Gym Plan
+# Gym
 
 An auto-updating workout plan focused on leg hypertrophy with knee-safe ranges, plus well-rounded upper-body work. It runs entirely in the browser with no build step and no server.
 
@@ -45,8 +45,8 @@ After changing app files, bump `CACHE` in `sw.js` so installed copies pick up th
 
 ## Android app (APK)
 
-`android/` wraps the same web app in a full-screen WebView. Every push to `main` builds it on GitHub Actions and publishes `leg-day-planner.apk` as the latest release:
-https://github.com/matthew-brooksmith/gym/releases/latest/download/leg-day-planner.apk
+`android/` wraps the same web app in a full-screen WebView. Every push to `main` builds it on GitHub Actions and publishes `gym.apk` as the latest release:
+https://github.com/matthew-brooksmith/gym/releases/latest/download/gym.apk
 
 Install it on the phone (allow your browser to install unknown apps when asked). New releases install over the old one and keep your data, because every build is signed with the same sideload key in `android/signing/`. Build locally with `gradle -p android assembleRelease` if you have the Android SDK.
 

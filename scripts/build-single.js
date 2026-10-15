@@ -17,7 +17,7 @@ const page = [
     .replace('<script src="plan.js"></script>', () => `<script>\n${read('plan.js')}</script>`)
     .replace('<script src="app.js"></script>', () => `<script>\n${read('app.js')}</script>`),
 ].join('\n');
-const out = process.argv[2] || path.join(root, 'dist', 'leg-day-planner.html');
+const out = process.argv[2] || path.join(root, 'dist', 'gym.html');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, page);
 console.log(`Wrote ${out} (${page.length} bytes)`);

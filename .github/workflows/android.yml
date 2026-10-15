@@ -25,16 +25,16 @@ jobs:
         run: npm test
       - name: Build APK
         run: gradle -p android assembleRelease --no-daemon
-      - run: cp android/app/build/outputs/apk/release/app-release.apk leg-day-planner.apk
+      - run: cp android/app/build/outputs/apk/release/app-release.apk gym.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: leg-day-planner-apk
-          path: leg-day-planner.apk
+          name: gym-apk
+          path: gym.apk
       - name: Publish release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: Leg Day Planner 1.0.${{ github.run_number }}
-          files: leg-day-planner.apk
+          name: Gym 1.0.${{ github.run_number }}
+          files: gym.apk
           make_latest: true
