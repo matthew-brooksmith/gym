@@ -75,6 +75,10 @@
     const d = new Date(iso + 'T12:00:00');
     return isNaN(d) ? iso : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   };
+  const fmtClock = (sec) => {
+    const s = Math.max(0, Math.round(sec));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
   const GROUP_ORDER = ['glutes', 'quads', 'hamstrings', 'adductors', 'calves', 'knee stability', 'chest', 'back', 'shoulders', 'arms', 'core'];
 
   let tab = 'today';
@@ -117,7 +121,11 @@
       </div>
       ${lastLine(ex, lift)}
       ${ex.kneeNote ? `<details class="knee"><summary>Notes</summary><p>${esc(ex.kneeNote)}</p></details>` : ''}
-      <div class="log"><div class="log-row">${weightInput}${setInputs}</div></div>
+      <div class="log"><div class="log-row">${weightInput}${setInputs}</div>
+        <div class="timer-btns">
+          ${ex.unit === 'sec' ? `<button type="button" class="chipbtn" data-hold="${ex.id}" data-min="${ex.min}" data-max="${ex.max}">Start hold</button>` : ''}
+          <button type="button" class="chipbtn" data-rest="${ex.restSec}" data-name="${esc(ex.name)}">Rest ${fmtClock(ex.restSec)}</button>
+        </div></div>
     </article>`;
   }
 
@@ -245,6 +253,101 @@
 
   const view = $('#view');
 
+  // ---------- timers ----------
+  // Rest counts down from the exercise's rest time and starts automatically when
+  // a set is logged. Hold counts up for timed exercises and fills in the set.
+  // Times are kept as timestamps so they stay right if the screen sleeps.
+  let timer = null;
+  let tick = null;
+  let audio = null;
+
+  function alertDone() {
+    try { if (navigator.vibrate) navigator.vibrate([250, 120, 250, 120, 250]); } catch (e) { /* ignore */ }
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.3, 0.6].forEach((t) => {
+        const o = audio.createOscillator();
+        const g = audio.createGain();
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(0.25, audio.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + t + 0.2);
+        o.connect(g).connect(audio.destination);
+        o.start(audio.currentTime + t);
+        o.stop(audio.currentTime + t + 0.22);
+      });
+    } catch (e) { /* no audio */ }
+  }
+
+  function startRest(sec, name) {
+    timer = { kind: 'rest', name, end: Date.now() + sec * 1000, alerted: false };
+    runTimer();
+  }
+  function startHold(exId, min, max) {
+    timer = { kind: 'hold', exId, min, max, start: Date.now(), alerted: false };
+    runTimer();
+  }
+  function stopTimer() {
+    timer = null;
+    clearInterval(tick);
+    $('#timer').hidden = true;
+  }
+  function runTimer() {
+    clearInterval(tick);
+    if (audio && audio.state === 'suspended') audio.resume();
+    drawTimer();
+    tick = setInterval(drawTimer, 250);
+  }
+  function drawTimer() {
+    if (!timer) return;
+    const el = $('#timer');
+    el.hidden = false;
+    if (timer.kind === 'rest') {
+      const left = (timer.end - Date.now()) / 1000;
+      const done = left <= 0;
+      if (done && !timer.alerted) { timer.alerted = true; alertDone(); }
+      el.className = done ? 'timer done' : 'timer';
+      el.innerHTML = `<div class="t-main"><span class="t-label">${done ? 'Rest over' : 'Rest'}</span><span class="t-clock">${done ? 'Go' : fmtClock(Math.ceil(left))}</span></div>
+        <div class="t-btns"><button type="button" data-t="minus">−15</button><button type="button" data-t="plus">+15</button><button type="button" data-t="stop">${done ? 'Close' : 'Skip'}</button></div>`;
+    } else {
+      const secs = (Date.now() - timer.start) / 1000;
+      if (secs >= timer.max && !timer.alerted) { timer.alerted = true; alertDone(); }
+      el.className = secs >= timer.min ? 'timer done' : 'timer';
+      el.innerHTML = `<div class="t-main"><span class="t-label">Hold ${timer.min}–${timer.max}s</span><span class="t-clock">${Math.floor(secs)}s</span></div>
+        <div class="t-btns"><button type="button" data-t="hold-done">Done</button><button type="button" data-t="stop">Cancel</button></div>`;
+    }
+  }
+
+  $('#timer').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-t]');
+    if (!b || !timer) return;
+    const t = b.dataset.t;
+    if (t === 'stop') stopTimer();
+    else if (t === 'minus') { timer.end -= 15000; drawTimer(); }
+    else if (t === 'plus') { timer.end = Math.max(timer.end, Date.now()) + 15000; timer.alerted = false; drawTimer(); }
+    else if (t === 'hold-done') {
+      const secs = Math.floor((Date.now() - timer.start) / 1000);
+      const exId = timer.exId;
+      const empty = Array.from(document.querySelectorAll(`#view input[data-ex="${exId}"][data-set]`)).find((i) => i.value === '');
+      if (empty) {
+        empty.value = secs;
+        empty.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      const restBtn = empty && empty.closest('.ex').querySelector('button[data-rest]');
+      if (restBtn) startRest(Number(restBtn.dataset.rest), restBtn.dataset.name);
+      else stopTimer();
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && timer) drawTimer(); });
+
+  view.addEventListener('change', (e) => {
+    const el = e.target;
+    if (!el.dataset.set || el.value === '') return;
+    if (timer && timer.kind === 'hold') return;
+    const restBtn = el.closest('.ex').querySelector('button[data-rest]');
+    if (restBtn) startRest(Number(restBtn.dataset.rest), restBtn.dataset.name);
+  });
+
   view.addEventListener('input', (e) => {
     if (!e.target.dataset.ex) return;
     state.draft = { index: state.sessionCount, log: readDraft() };
@@ -263,6 +366,8 @@
   view.addEventListener('click', (e) => {
     const t = e.target.closest('button');
     if (!t) return;
+    if (t.dataset.rest) { startRest(Number(t.dataset.rest), t.dataset.name); return; }
+    if (t.dataset.hold) { startHold(t.dataset.hold, Number(t.dataset.min), Number(t.dataset.max)); return; }
     if (t.id === 'finish') {
       const log = readDraft();
       const empty = Object.values(log).every((x) => x.reps.every((v) => v == null));
@@ -272,6 +377,7 @@
       state = res.state;
       delete state.draft;
       lastOutcomes = res.outcomes;
+      stopTimer();
       save();
       render();
       window.scrollTo(0, 0);

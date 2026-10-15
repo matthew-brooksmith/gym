@@ -135,6 +135,26 @@ details.hist ul { font-size: 14px; margin-top: 6px; }
 }
 .lastmini { display: none; }
 
+/* Timers */
+.timer-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.chipbtn { font: 600 14px var(--body); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }
+.timer {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--ink); color: var(--bg);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
+[hidden] { display: none !important; }
+.timer.done { background: var(--up); color: #fff; }
+.t-main { display: grid; }
+.t-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; font-weight: 600; }
+.t-clock { font: 700 36px/1 var(--display); font-variant-numeric: tabular-nums; }
+.t-btns { display: flex; gap: 6px; }
+.t-btns button { font: 600 15px var(--body); padding: 10px 12px; border-radius: 8px; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; min-width: 48px; }
+body:has(.timer:not([hidden])) .wrap { padding-bottom: 110px; }
+
 /* Very small phones (e.g. 3-inch screens around 240–320 CSS px wide). */
 @media (max-width: 360px) {
   body { font-size: 15px; }
@@ -165,6 +185,10 @@ details.hist ul { font-size: 14px; margin-top: 6px; }
   th, td { padding: 6px 4px; }
   .bar { grid-template-columns: 84px 1fr 24px; font-size: 13px; }
   .grid2 { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .timer { padding-left: 10px; padding-right: 10px; gap: 6px; }
+  .t-clock { font-size: 30px; }
+  .t-btns button { padding: 9px 8px; min-width: 40px; font-size: 14px; }
+  .chipbtn { font-size: 13px; padding: 5px 10px; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .flash { animation: flash 1.2s ease-out; }
