@@ -140,19 +140,23 @@
 
   function scheduleStrip() {
     return `<ol class="strip">${P.upcoming(state, 6).map((d, i) =>
-      `<li class="${d.id === 'yoga' ? 'yoga' : d.id.startsWith('lower') ? 'legs' : 'upper'}${i === 0 ? ' now' : ''}">${esc(d.short)}</li>`).join('')}</ol>`;
+      `<li class="${d.id.startsWith('yoga') ? 'yoga' : d.id.startsWith('lower') ? 'legs' : 'upper'}${i === 0 ? ' now' : ''}">${esc(d.short)}</li>`).join('')}</ol>`;
   }
 
   function renderYoga(s) {
+    const cur = timer && timer.kind === 'flow' ? timer.step : -1;
+    const rows = s.flow.map((p, i) => `<li class="${i === cur ? 'now' : ''}">
+        <button type="button" class="pose" data-pose="${i}"><span class="pose-name">${esc(p.name)}${p.sides ? ' <span class="muted small">each side</span>' : ''}</span><span class="pose-min">${p.min} min</span></button>
+        <p class="pose-cue">${esc(p.cue)}</p></li>`).join('');
     return `${scheduleStrip()}
       <section class="head">
-        <span class="eyebrow">Session ${s.index + 1} · Yoga day</span>
-        <h1>Yoga</h1>
+        <span class="eyebrow">Session ${s.index + 1} · ${s.minutes} min</span>
+        <h1>${esc(s.name)}</h1>
       </section>
       <article class="ex">
-        <div class="target"><div class="try"><span class="label">Session</span><span class="kg">${s.minutes}</span><span class="unit">min</span></div></div>
+        <ol class="flow">${rows}</ol>
         <details class="knee"><summary>Notes</summary><p>${esc(s.note)}</p></details>
-        <div class="timer-btns"><button type="button" class="chipbtn" data-countdown="${s.minutes * 60}" data-name="Yoga">Start ${s.minutes}:00 timer</button></div>
+        <div class="timer-btns"><button type="button" class="chipbtn" data-flow="0">Start guided flow</button></div>
       </article>
       <button type="button" class="primary" id="finish">Done</button>`;
   }
@@ -308,6 +312,19 @@
     timer = { kind: 'hold', exId, min, max, start: Date.now(), alerted: false };
     runTimer();
   }
+  // Guided yoga: steps through each pose, beeping at the switch-sides point and between poses.
+  function startFlow(step) {
+    const flow = P.nextSession(state).flow;
+    if (!flow || !flow[step]) { stopTimer(); return; }
+    const p = flow[step];
+    const len = p.min * 60 * 1000;
+    timer = { kind: 'flow', flow, step, start: Date.now(), end: Date.now() + len, half: p.sides ? Date.now() + len / 2 : null, alertedHalf: false };
+    runTimer();
+    markPose();
+  }
+  function markPose() {
+    document.querySelectorAll('.flow li').forEach((li, i) => li.classList.toggle('now', !!timer && timer.kind === 'flow' && i === timer.step));
+  }
   function stopTimer() {
     timer = null;
     clearInterval(tick);
@@ -323,6 +340,23 @@
     if (!timer) return;
     const el = $('#timer');
     el.hidden = false;
+    if (timer.kind === 'flow') {
+      const now = Date.now();
+      if (timer.half && !timer.alertedHalf && now >= timer.half) { timer.alertedHalf = true; alertDone(); }
+      if (now >= timer.end) {
+        alertDone();
+        if (timer.step + 1 < timer.flow.length) { startFlow(timer.step + 1); return; }
+        timer = { kind: 'rest', label: 'Yoga', end: now, alerted: true };
+      } else {
+        const p = timer.flow[timer.step];
+        const next = timer.flow[timer.step + 1];
+        const side = timer.half ? (now < timer.half ? 'Side 1 · ' : 'Side 2 · ') : '';
+        el.className = 'timer';
+        el.innerHTML = `<div class="t-main"><span class="t-label">${side}${esc(p.name)}</span><span class="t-clock">${fmtClock(Math.ceil((timer.end - now) / 1000))}</span>${next ? `<span class="t-next">Next: ${esc(next.name)}</span>` : ''}</div>
+          <div class="t-btns"><button type="button" data-t="flow-next">Next</button><button type="button" data-t="stop">Stop</button></div>`;
+        return;
+      }
+    }
     if (timer.kind === 'rest') {
       const left = (timer.end - Date.now()) / 1000;
       const done = left <= 0;
@@ -343,7 +377,8 @@
     const b = e.target.closest('button[data-t]');
     if (!b || !timer) return;
     const t = b.dataset.t;
-    if (t === 'stop') stopTimer();
+    if (t === 'stop') { stopTimer(); markPose(); }
+    else if (t === 'flow-next') { if (timer.step + 1 < timer.flow.length) startFlow(timer.step + 1); else { stopTimer(); markPose(); } }
     else if (t === 'minus') { timer.end -= 15000; drawTimer(); }
     else if (t === 'plus') { timer.end = Math.max(timer.end, Date.now()) + 15000; timer.alerted = false; drawTimer(); }
     else if (t === 'hold-done') {
@@ -388,6 +423,8 @@
   view.addEventListener('click', (e) => {
     const t = e.target.closest('button');
     if (!t) return;
+    if (t.dataset.flow) { startFlow(Number(t.dataset.flow)); return; }
+    if (t.dataset.pose) { startFlow(Number(t.dataset.pose)); return; }
     if (t.dataset.countdown) { startRest(Number(t.dataset.countdown), t.dataset.name, t.dataset.name); return; }
     if (t.dataset.rest) { startRest(Number(t.dataset.rest), t.dataset.name); return; }
     if (t.dataset.hold) { startHold(t.dataset.hold, Number(t.dataset.min), Number(t.dataset.max)); return; }

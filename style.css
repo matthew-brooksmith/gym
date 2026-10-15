@@ -142,6 +142,17 @@ details.hist ul { font-size: 14px; margin-top: 6px; }
 .strip li.yoga { border-color: var(--up); color: var(--up); }
 .strip li.now { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 
+/* Yoga flow */
+.flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.flow li { border-top: 1px solid var(--line); padding: 6px 0; }
+.flow li:first-child { border-top: 0; }
+.flow li.now { background: var(--field); border-radius: 8px; padding-inline: 8px; }
+.pose { all: unset; display: flex; justify-content: space-between; gap: 8px; width: 100%; cursor: pointer; font-weight: 600; }
+.pose:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pose-min { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--up); }
+.pose-cue { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.t-next { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+
 /* Timers */
 .timer-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .chipbtn { font: 600 14px var(--body); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }

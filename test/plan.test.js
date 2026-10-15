@@ -56,7 +56,7 @@ test('rotation alternates lower and upper and advances', () => {
   let s = fresh();
   const ids = [];
   for (let i = 0; i < 7; i++) { ids.push(P.nextSession(s).id); s = P.completeSession(s, {}).state; }
-  assert.deepStrictEqual(ids, ['lower_a', 'upper_a', 'yoga', 'lower_b', 'upper_b', 'yoga', 'lower_a']);
+  assert.deepStrictEqual(ids, ['lower_a', 'upper_a', 'yoga_a', 'lower_b', 'upper_b', 'yoga_b', 'lower_a']);
 });
 
 test('deload weeks halve sets and do not progress', () => {
@@ -113,11 +113,15 @@ test('a logged estimate is kept when body mass changes', () => {
 test('yoga days are an hour with no lifts, and appear in the upcoming strip', () => {
   const s = Object.assign(fresh(), { sessionCount: 2 });
   const sess = P.nextSession(s);
-  assert.strictEqual(sess.id, 'yoga');
+  assert.strictEqual(sess.id, 'yoga_a');
   assert.strictEqual(sess.minutes, 60);
   assert.strictEqual(sess.exercises.length, 0);
   const r = P.completeSession(s, {});
   assert.strictEqual(r.state.sessionCount, 3);
-  assert.strictEqual(r.state.history[0].name, 'Yoga');
-  assert.deepStrictEqual(P.upcoming(fresh(), 6).map((d) => d.short), ['Legs A', 'Upper A', 'Yoga', 'Legs B', 'Upper B', 'Yoga']);
+  assert.strictEqual(r.state.history[0].name, 'Yoga: hips & legs');
+  assert.strictEqual(sess.flow.reduce((t, p) => t + p.min, 0), 60);
+  const b = P.nextSession(Object.assign(fresh(), { sessionCount: 5 }));
+  assert.strictEqual(b.id, 'yoga_b');
+  assert.strictEqual(b.flow.reduce((t, p) => t + p.min, 0), 60);
+  assert.deepStrictEqual(P.upcoming(fresh(), 6).map((d) => d.short), ['Legs A', 'Upper A', 'Yoga A', 'Legs B', 'Upper B', 'Yoga B']);
 });

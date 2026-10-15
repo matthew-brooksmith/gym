@@ -60,19 +60,56 @@
 
   // Sessions rotate in this order regardless of how many days a week you train.
   // Yoga follows each upper day, so there is always a lighter day before legs.
-  const YOGA = { id: 'yoga', name: 'Yoga', short: 'Yoga', minutes: 60, exercises: [],
-    note: 'Swap poses with deep knee bend (hero, child\'s pose, deep lunge, lotus) for supported or straight-leg versions.' };
+  // Hip flexibility and leg mobility, kept knee-safe: no kneeling on the
+  // kneecap, no deep loaded knee bend, no twisting through a bent knee.
+  // `sides` poses switch legs halfway through.
+  const YOGA_FLOW = [
+    { name: 'Cat-cow', min: 3, cue: 'On hands and knees with padding under the knees. Slow spine waves.' },
+    { name: 'Standing hip flexor stretch', min: 6, sides: true, cue: 'Short split stance, back leg straight, tuck the pelvis and squeeze the back glute.' },
+    { name: 'Pyramid pose', min: 4, sides: true, cue: 'Both legs straight but not locked, hinge over the front leg.' },
+    { name: 'Wide-leg forward fold', min: 4, cue: 'Feet wide, knees soft, hands to blocks or floor.' },
+    { name: 'Tree pose', min: 4, sides: true, cue: 'Standing knee soft, foot on the calf (never the knee).' },
+    { name: 'Bridge holds', min: 4, cue: '30 s holds with short rests. Knees in line with the hips.' },
+    { name: 'Strap hamstring stretch', min: 6, sides: true, cue: 'On your back, strap round the foot, leg straight up.' },
+    { name: 'Reclined figure-four', min: 6, sides: true, cue: 'Ankle over the opposite thigh, hands behind the thigh, not the shin.' },
+    { name: 'Strap leg to the side', min: 4, sides: true, cue: 'On your back, straight leg lowered out to the side for the inner thigh.' },
+    { name: 'Supported butterfly', min: 4, cue: 'On your back, soles together, blocks or cushions under both knees.' },
+    { name: 'Supine twist, top leg straight', min: 4, sides: true, cue: 'Straight top leg across the body; knees never bent and twisted.' },
+    { name: 'Legs up the wall, wide', min: 5, cue: 'Let the legs fall open into a straddle.' },
+    { name: 'Savasana', min: 6, cue: 'Legs long, a cushion under the knees if comfortable.' },
+  ];
+  // Shoulders, chest, spine and balance, with lighter hip work so the week stays even.
+  const YOGA_FLOW_UPPER = [
+    { name: 'Cat-cow', min: 3, cue: 'On hands and knees with padding under the knees. Slow spine waves.' },
+    { name: 'Thread the needle', min: 4, sides: true, cue: 'From hands and knees, slide one arm under and rest the shoulder down.' },
+    { name: 'Standing side bend', min: 3, cue: 'Arms overhead, lean one way then the other, legs straight.' },
+    { name: 'Chest opener, hands clasped behind', min: 3, cue: 'Standing, lift the clasped hands away from the back.' },
+    { name: 'Eagle arms', min: 4, sides: true, cue: 'Standing tall, legs straight; wrap the arms only.' },
+    { name: 'Puppy pose at the wall', min: 4, cue: 'Hands high on the wall, hinge at the hips and let the chest sink.' },
+    { name: 'Tree pose', min: 4, sides: true, cue: 'Standing knee soft, foot on the calf (never the knee).' },
+    { name: 'Warrior III, hands on the wall', min: 4, sides: true, cue: 'Hinge forward on one leg, standing knee soft, back leg in line with the body.' },
+    { name: 'Half moon at the wall', min: 4, sides: true, cue: 'Back against the wall, both legs straight, hand on a block.' },
+    { name: 'Doorway chest stretch', min: 4, sides: true, cue: 'Forearm on the frame at shoulder height, turn away gently.' },
+    { name: 'Sphinx', min: 4, cue: 'Lying on the front, forearms down, lift the chest.' },
+    { name: 'Floor angels', min: 4, cue: 'On your back, arms in a W, slide them up and down the floor.' },
+    { name: 'Strap hamstring stretch', min: 4, sides: true, cue: 'On your back, strap round the foot, leg straight up.' },
+    { name: 'Supine twist, top leg straight', min: 4, sides: true, cue: 'Straight top leg across the body; knees never bent and twisted.' },
+    { name: 'Savasana', min: 7, cue: 'Legs long, a cushion under the knees if comfortable.' },
+  ];
+  const YOGA_NOTE = 'Avoid hero, child\'s pose, pigeon, lotus and deep lunges.';
+  const YOGA_A = { id: 'yoga_a', name: 'Yoga: hips & legs', short: 'Yoga A', minutes: 60, exercises: [], flow: YOGA_FLOW, note: YOGA_NOTE };
+  const YOGA_B = { id: 'yoga_b', name: 'Yoga: upper body & balance', short: 'Yoga B', minutes: 60, exercises: [], flow: YOGA_FLOW_UPPER, note: YOGA_NOTE };
   const ROTATION = [
     { id: 'lower_a', short: 'Legs A', name: 'Lower A: glutes & hamstrings',
       exercises: ['hip_thrust', 'rdl', 'leg_press_shallow', 'leg_curl', 'hip_abduction', 'cable_adduction', 'calf_standing', 'tke'] },
     { id: 'upper_a', short: 'Upper A', name: 'Upper A: horizontal push & pull',
       exercises: ['bench', 'row', 'ohp', 'pulldown', 'lateral_raise', 'triceps', 'pallof'] },
-    YOGA,
+    YOGA_A,
     { id: 'lower_b', short: 'Legs B', name: 'Lower B: knee-safe quads & stability',
       exercises: ['spanish_squat', 'leg_press_heavy', 'step_up', 'cable_pull_through', 'cable_kickback', 'copenhagen', 'calf_seated', 'tke', 'single_leg_balance'] },
     { id: 'upper_b', short: 'Upper B', name: 'Upper B: incline, back & arms',
       exercises: ['incline_db', 'cable_row', 'pulldown', 'face_pull', 'curl', 'triceps', 'cable_crunch'] },
-    YOGA,
+    YOGA_B,
   ];
 
   // Every 6th pass through the rotation is a deload: half the sets, same weights.
@@ -185,6 +222,7 @@
       name: day.name,
       minutes: day.minutes || null,
       note: day.note || '',
+      flow: day.flow || null,
       deload,
       exercises: day.exercises.map((id) => targetFor(id, state.lifts[id], deload)),
     };
