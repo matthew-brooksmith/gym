@@ -1,6 +1,6 @@
 {
-  "name": "Leg Day Planner",
-  "short_name": "Leg Day",
+  "name": "Gym",
+  "short_name": "Gym",
   "description": "Knee-safe, leg-focused workout plan that tells you what weight to try next.",
   "start_url": "./",
   "scope": "./",
