@@ -116,7 +116,7 @@
         </dl>
       </div>
       ${lastLine(ex, lift)}
-      ${ex.kneeNote ? `<details class="knee"><summary>Form and knee note</summary><p>${esc(ex.kneeNote)}</p></details>` : ''}
+      ${ex.kneeNote ? `<details class="knee"><summary>Notes</summary><p>${esc(ex.kneeNote)}</p></details>` : ''}
       <div class="log"><div class="log-row">${weightInput}${setInputs}</div></div>
     </article>`;
   }
