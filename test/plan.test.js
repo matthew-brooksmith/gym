@@ -87,3 +87,25 @@ test('nutrition', () => {
   assert.strictEqual(n.proteinLow, 128);
   assert.ok(n.leanGain > n.maintenance);
 });
+
+test('weight actually used overrides the suggestion and is remembered as the last attempt', () => {
+  const s = P.setWeight(fresh(), 'bench', 80);
+  const r = P.completeSession(Object.assign({}, s, { sessionCount: 1 }), { bench: { weight: 85, reps: [10, 10, 10, 10] } }, '2026-10-15');
+  const lift = r.state.lifts.bench;
+  assert.strictEqual(lift.weight, 87.5);
+  assert.deepStrictEqual(lift.last, { date: '2026-10-15', weight: 85, results: [10, 10, 10, 10], unit: 'reps', change: 'up', message: '+2.5 kg → 87.5 kg' });
+});
+
+test('targets carry rest and effort guidance', () => {
+  const t = P.nextSession(fresh()).exercises;
+  assert.strictEqual(t[0].rest, '2–3 min');
+  assert.match(t.find((e) => e.id === 'leg_press_shallow').effort, /never grind/);
+});
+
+test('a logged estimate is kept when body mass changes', () => {
+  let s = fresh();
+  s = P.completeSession(s, { hip_thrust: { reps: [10, 10, 10, 10] } }).state;
+  s.profile.bodyMass = 100;
+  s = P.syncLifts(s);
+  assert.strictEqual(s.lifts.hip_thrust.weight, 75);
+});

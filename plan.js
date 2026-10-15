@@ -13,13 +13,13 @@
   const EXERCISES = {
     hip_thrust: { name: 'Barbell hip thrust', group: 'glutes', sets: 4, min: 8, max: 12, increment: 5, ratio: 1.0,
       kneeNote: 'Knees stay at ~90° and do not move under load. Main glute builder.' },
-    rdl: { name: 'Romanian deadlift', group: 'hamstrings', sets: 3, min: 8, max: 10, increment: 5, ratio: 0.8,
+    rdl: { name: 'Romanian deadlift', group: 'hamstrings', sets: 4, min: 8, max: 10, increment: 5, ratio: 0.8,
       kneeNote: 'Soft, fixed knee bend; all movement is at the hip.' },
     leg_press_shallow: { name: 'Leg press (stop at ~60° knee bend)', group: 'quads', sets: 3, min: 10, max: 15, increment: 10, ratio: 1.5,
       kneeNote: 'Closed-chain and guided. Set the stops or depth so knees never pass ~60°; feet higher on the plate shifts work to glutes.' },
     leg_press_heavy: { name: 'Leg press, heavier (stop at ~60° knee bend)', group: 'quads', sets: 4, min: 8, max: 12, increment: 10, ratio: 1.8,
       kneeNote: 'Same shallow range as day A, heavier load. Stop the set if the kneecap feels unsteady.' },
-    leg_curl: { name: 'Seated leg curl', group: 'hamstrings', sets: 3, min: 10, max: 15, increment: 2.5, ratio: 0.35,
+    leg_curl: { name: 'Seated leg curl', group: 'hamstrings', sets: 4, min: 10, max: 15, increment: 2.5, ratio: 0.35,
       kneeNote: 'Machine-guided and unloaded through the joint; hamstrings help stabilise the knee.' },
     calf_standing: { name: 'Standing calf raise', group: 'calves', sets: 4, min: 10, max: 15, increment: 5, ratio: 0.8,
       kneeNote: 'Straight knees.' },
@@ -134,7 +134,26 @@
       perHand: !!ex.perHand,
       loaded: ex.increment > 0,
       kneeNote: ex.kneeNote || '',
+      rest: restFor(ex),
+      effort: effortFor(id, ex),
     };
+  }
+
+  // Hypertrophy guidance: heavier, lower-rep work needs longer rest to keep
+  // the next set productive; isolation work recovers faster.
+  function restFor(ex) {
+    if (ex.unit === 'sec') return '60 s';
+    return ex.min <= 8 ? '2–3 min' : '60–90 s';
+  }
+
+  // How close to failure to take each set. Knee-loaded movements stay further
+  // from failure so form never breaks down around the kneecap.
+  const KNEE_LOADED = ['leg_press_shallow', 'leg_press_heavy', 'step_up', 'spanish_squat'];
+  function effortFor(id, ex) {
+    if (ex.unit === 'sec' || !ex.increment) return 'Controlled, full squeeze each rep';
+    if (KNEE_LOADED.includes(id)) return 'Stop 2 reps before failure, never grind';
+    if (ex.min <= 8) return 'Stop 1–2 reps before failure';
+    return 'Last set to 0–1 reps before failure';
   }
 
   function nextSession(state) {
@@ -153,8 +172,13 @@
   //  - every set at the top of the range  -> add load (or reps/seconds if unloaded)
   //  - any set below the bottom of range  -> a strike; 2 strikes in a row -> drop 10%
   //  - otherwise                          -> same weight, aim for more reps
-  function progress(id, lift, results) {
+  // `used` is the weight actually lifted, when it differs from the suggestion.
+  function progress(id, current, results, used) {
     const ex = EXERCISES[id];
+    const lift = Object.assign({}, current);
+    if (ex.increment && Number(used) > 0 && Number(used) !== lift.weight) {
+      Object.assign(lift, { weight: Number(used), source: 'user', strikes: 0 });
+    }
     const t = targetFor(id, lift, false);
     const done = results.filter((r) => r !== null && r !== undefined && r !== '').map(Number);
     const next = Object.assign({}, lift);
@@ -192,24 +216,34 @@
   }
 
   // Apply a whole session's log and advance the rotation.
-  // log: { [exerciseId]: number[] }
-  function completeSession(state, log) {
+  // log: { [exerciseId]: { reps: number[], weight?: number } } (a bare reps array also works)
+  function completeSession(state, log, date) {
     const session = nextSession(state);
+    const day = date || new Date().toISOString().slice(0, 10);
     const lifts = Object.assign({}, state.lifts);
     const outcomes = [];
     for (const ex of session.exercises) {
-      const results = log[ex.id] || [];
+      const entry = Array.isArray(log[ex.id]) ? { reps: log[ex.id] } : (log[ex.id] || {});
+      const results = (entry.reps || []).filter((r) => r !== null && r !== undefined && r !== '').map(Number);
+      let out;
       if (session.deload) {
-        outcomes.push({ id: ex.id, name: ex.name, change: 'hold', message: 'Deload, no change', results });
-        continue;
+        const lift = Object.assign({}, lifts[ex.id]);
+        if (ex.loaded && Number(entry.weight) > 0) Object.assign(lift, { weight: Number(entry.weight), source: 'user' });
+        out = { lift, change: 'hold', message: 'Deload week, same target next time' };
+      } else {
+        out = progress(ex.id, lifts[ex.id], results, entry.weight);
       }
-      const out = progress(ex.id, lifts[ex.id], results);
+      const used = ex.loaded ? (Number(entry.weight) > 0 ? Number(entry.weight) : lifts[ex.id].weight) : null;
+      if (results.length) {
+        if (out.lift.source === 'estimate') out.lift.source = 'logged';
+        out.lift.last = { date: day, weight: used, results, unit: ex.unit, change: out.change, message: out.message };
+      }
       lifts[ex.id] = out.lift;
-      outcomes.push({ id: ex.id, name: ex.name, change: out.change, message: out.message, results });
+      outcomes.push({ id: ex.id, name: ex.name, change: out.change, message: out.message, results, weight: used, next: out.lift.weight });
     }
-    const entry = { date: new Date().toISOString().slice(0, 10), session: session.id, name: session.name, deload: session.deload, outcomes };
+    const record = { date: day, session: session.id, name: session.name, deload: session.deload, outcomes };
     return {
-      state: Object.assign({}, state, { lifts, sessionCount: state.sessionCount + 1, history: [entry].concat(state.history).slice(0, 200) }),
+      state: Object.assign({}, state, { lifts, sessionCount: state.sessionCount + 1, history: [record].concat(state.history).slice(0, 60) }),
       outcomes,
     };
   }

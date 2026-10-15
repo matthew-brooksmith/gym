@@ -4,13 +4,11 @@ An auto-updating workout plan focused on leg hypertrophy with knee-safe ranges, 
 
 ## Use it
 
-Open `index.html` in a browser (or serve the folder with GitHub Pages). Then:
+Open `index.html` in a browser, or use the published copy at https://claude.ai/artifact/CTTfEFqGU4uVQSY3YKejSs (saves to your claude.ai account, so it works across devices).
 
-1. Enter body mass and height (age and sex are optional and only used for a calorie estimate).
-2. Enter the working weights you know under **Working weights**. Anything you leave alone is estimated from body mass and shown in grey.
-3. At the gym, log reps (or seconds for holds) for each set of the **Next session**, then press **Complete session**. The plan applies the progression rules and moves on to the next day.
-
-Data is saved in the browser. Use **Export / Import** to move it between devices.
+- **Today** shows the next session. Each exercise card gives the weight to try, sets × rep range, rest time and how close to failure to go, plus what you did last time. Log the weight you actually used and the reps for each set, then press **Finish workout**.
+- **All lifts** lists the next weight and last attempt for every exercise. Type your real working weights here to replace the body-mass estimates (shown in italics).
+- **Me** holds body mass and height (plus optional age and sex for a calorie estimate), weekly sets per muscle, the knee rules and your history.
 
 ## How the plan updates
 
@@ -35,6 +33,10 @@ This is general training guidance; a physio's advice for your knee takes priorit
 ## Customise
 
 Exercises, sets, rep ranges, increments and the rotation live at the top of `plan.js`.
+
+## Publishing a single-file copy
+
+`node scripts/build-single.js [out.html]` inlines the CSS and JS into one page (no doctype/head, as claude.ai artifacts expect).
 
 ## Tests
 
