@@ -114,7 +114,7 @@
       <div class="target">
         <div class="try"><span class="label">Try</span>${big}</div>
         <dl class="spec">
-          <div><dt>Sets × ${ex.unit === 'sec' ? 'secs' : 'reps'}</dt><dd>${ex.sets} × ${ex.min}–${ex.max}${unitShort(ex.unit)}</dd></div>
+          <div><dt>Sets</dt><dd>${ex.sets} × ${ex.min}–${ex.max}${unitShort(ex.unit)}</dd></div>
           <div><dt>Rest</dt><dd>${esc(ex.rest)}</dd></div>
           <div><dt>Effort</dt><dd>${esc(ex.effort)}</dd></div>
         </dl>
@@ -169,13 +169,13 @@
         const last = lift.last
           ? `${lift.last.weight ? fmt(lift.last.weight) + ' kg × ' : ''}${lift.last.results.join(', ')}${unitShort(lift.last.unit)} <span class="muted small">${esc(dateLabel(lift.last.date))}</span>`
           : '<span class="muted">Not yet</span>';
-        return `<tr><td>${esc(ex.name)}<br><span class="muted small">${target}</span></td><td>${next}</td><td>${last}</td></tr>`;
+        return `<tr><td>${esc(ex.name)}<br><span class="muted small">${target}</span><div class="lastmini small">Last: ${last}</div></td><td>${next}</td><td class="lastcol">${last}</td></tr>`;
       }).join('');
     }).join('');
     return `<section class="head"><span class="eyebrow">Next weight for every exercise</span><h1>All lifts</h1>
         <p class="muted small">Italic weights are estimates from your body mass and update when it changes. Type your real working weight to replace one.</p></section>
       <section class="panel"><div class="table-wrap"><table>
-        <thead><tr><th>Exercise</th><th>Next (kg)</th><th>Last attempt</th></tr></thead>
+        <thead><tr><th>Exercise</th><th>Next (kg)</th><th class="lastcol">Last attempt</th></tr></thead>
         <tbody>${rows}</tbody></table></div></section>`;
   }
 

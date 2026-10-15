@@ -129,6 +129,39 @@ details.hist ul { font-size: 14px; margin-top: 6px; }
   .try .kg { font-size: 38px; }
   .spec div { grid-template-columns: 64px 1fr; }
 }
+.lastmini { display: none; }
+
+/* Very small phones (e.g. 3-inch screens around 240–320 CSS px wide). */
+@media (max-width: 360px) {
+  body { font-size: 15px; }
+  .wrap {
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+    padding-block: 8px 32px; gap: 12px;
+  }
+  h1 { font-size: 23px; }
+  h3 { font-size: 18px; }
+  nav.tabs { padding-block: 6px; }
+  nav.tabs button { font-size: 14px; padding: 9px 0; }
+  .ex, .panel { padding: 10px; gap: 8px; border-radius: 10px; }
+  .target { grid-template-columns: 1fr; gap: 6px; }
+  .try { grid-template-columns: auto auto 1fr; align-items: baseline; gap: 8px; padding-right: 0; border-right: 0; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .try .kg { font-size: 36px; }
+  .try .unit { align-self: baseline; }
+  .spec div { grid-template-columns: 58px 1fr; font-size: 13px; }
+  .last, .knee p { font-size: 13px; }
+  .log-row { gap: 6px; }
+  .log input { width: 48px; padding: 7px 4px; font-size: 16px; }
+  .log .weight input { width: 70px; }
+  .field { font-size: 11px; }
+  button.primary, button.secondary { font-size: 16px; padding: 12px; }
+  .lastcol { display: none; }
+  .lastmini { display: block; color: var(--muted); margin-top: 2px; }
+  td input { width: 64px; }
+  th, td { padding: 6px 4px; }
+  .bar { grid-template-columns: 84px 1fr 24px; font-size: 13px; }
+  .grid2 { grid-template-columns: 1fr 1fr; gap: 8px; }
+}
 @media (prefers-reduced-motion: no-preference) {
   .flash { animation: flash 1.2s ease-out; }
   @keyframes flash { from { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); } }
