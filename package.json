@@ -1,0 +1,8 @@
+{
+  "name": "gym-plan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Auto-updating, knee-friendly leg hypertrophy plan",
+  "scripts": { "test": "node --test test/*.test.js" },
+  "license": "MIT"
+}
