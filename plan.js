@@ -135,12 +135,19 @@
       loaded: ex.increment > 0,
       kneeNote: ex.kneeNote || '',
       rest: restFor(ex),
+      restSec: restSeconds(ex),
       effort: effortFor(id, ex),
     };
   }
 
   // Hypertrophy guidance: heavier, lower-rep work needs longer rest to keep
   // the next set productive; isolation work recovers faster.
+  // Default countdown for the rest timer, inside the ranges above.
+  function restSeconds(ex) {
+    if (ex.unit === 'sec') return 60;
+    return ex.min <= 8 ? 150 : 75;
+  }
+
   function restFor(ex) {
     if (ex.unit === 'sec') return '60 s';
     return ex.min <= 8 ? '2–3 min' : '60–90 s';

@@ -43,6 +43,13 @@ The app is a Progressive Web App: hosted on GitHub Pages it installs to the home
 
 After changing app files, bump `CACHE` in `sw.js` so installed copies pick up the new version.
 
+## Android app (APK)
+
+`android/` wraps the same web app in a full-screen WebView. Every push to `main` builds it on GitHub Actions and publishes `leg-day-planner.apk` as the latest release:
+https://github.com/matthew-brooksmith/gym/releases/latest/download/leg-day-planner.apk
+
+Install it on the phone (allow your browser to install unknown apps when asked). New releases install over the old one and keep your data, because every build is signed with the same sideload key in `android/signing/`. Build locally with `gradle -p android assembleRelease` if you have the Android SDK.
+
 ## Publishing a single-file copy
 
 `node scripts/build-single.js [out.html]` inlines the CSS and JS into one page (no doctype/head, as claude.ai artifacts expect).
