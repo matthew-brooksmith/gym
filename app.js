@@ -139,11 +139,9 @@
         <span class="eyebrow">Session ${s.index + 1} · ${kind}</span>
         <h1>${esc(s.name)}</h1>
         ${s.deload ? '<span class="pill">Deload week: half the sets, same weights, nothing moves up</span>' : ''}
-        <span class="saved" id="save-status">${esc(saveStatus)}</span>
       </section>
       ${s.exercises.map((ex) => exerciseCard(ex, state.lifts[ex.id], draft)).join('')}
-      <button type="button" class="primary" id="finish">${armed === 'finish' ? 'Nothing logged. Tap again to skip this session' : 'Finish workout'}</button>
-      <p class="muted small">Enter the reps you actually got for each set (seconds for holds). Change the weight if you used something different. When every set hits the top of the range, the weight goes up next time.</p>`;
+      <button type="button" class="primary" id="finish">${armed === 'finish' ? 'Nothing logged. Tap again to skip this session' : 'Finish workout'}</button>`;
   }
 
   // ---------- All lifts ----------
@@ -180,10 +178,9 @@
     const n = P.nutrition(p);
     let food = '';
     if (n) {
-      food = `<p>BMI <b>${n.bmi}</b>. For muscle growth aim for <b>${n.proteinLow}–${n.proteinHigh} g protein</b> a day.`;
-      food += n.maintenance
-        ? ` About <b>${n.maintenance} kcal</b> maintains your weight; about <b>${n.leanGain} kcal</b> supports slow, lean gain.</p>`
-        : ' Add age and sex for a calorie estimate.</p>';
+      const stats = [['BMI', n.bmi], ['Protein', `${n.proteinLow}–${n.proteinHigh} g/day`]];
+      if (n.maintenance) stats.push(['Maintenance', `${n.maintenance} kcal`], ['Lean gain', `${n.leanGain} kcal`]);
+      food = `<dl class="stats">${stats.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
     }
     const vol = P.weeklyVolume();
     const max = Math.max(...Object.values(vol));
@@ -193,7 +190,7 @@
       ? state.history.slice(0, 15).map((h) => `<details class="hist"><summary>${esc(dateLabel(h.date))} · ${esc(h.name)}${h.deload ? ' (deload)' : ''}</summary><ul>` +
           h.outcomes.map((o) => `<li>${esc(o.name)}: ${o.weight ? fmt(o.weight) + ' kg × ' : ''}${esc(o.results.join(', ') || 'not logged')} <span class="${esc(o.change)}">→ ${esc(o.message)}</span></li>`).join('') +
           '</ul></details>').join('')
-      : '<p class="muted">Finished workouts show up here.</p>';
+      : '';
     const backup = cloud ? '' : `<section class="panel"><h2>Backup</h2>
         <p class="muted small">Your data is saved in this browser only. Export it to move it to another device.</p>
         <div class="grid2"><button type="button" class="secondary" id="export">Export</button>
@@ -212,11 +209,9 @@
           <button type="submit" class="primary" style="grid-column:1/-1">Save body stats</button>
         </form>
         ${food}
-        <p class="muted small">Saving re-estimates only the weights you haven't entered or logged yet.</p>
       </section>
-      <section class="panel"><h2>Hard sets per muscle, per 4-session rotation</h2>${bars}
-        <p class="muted small">Legs get the most work. Hypertrophy generally needs about 10–20 hard sets per muscle a week.</p></section>
-      <section class="panel"><h2>History</h2>${hist}</section>
+      <section class="panel"><h2>Sets per muscle</h2>${bars}</section>
+      ${hist ? `<section class="panel"><h2>History</h2>${hist}</section>` : ''}
       ${backup}
       <button type="button" class="secondary danger" id="reset">${armed === 'reset' ? 'Tap again to erase everything' : 'Erase all weights and history'}</button>`;
   }
