@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The app is the same web app as the repo root, bundled into the APK's assets.
+def webOut = layout.buildDirectory.dir('generated/web')
+tasks.register('copyWeb', Copy) {
+    from(rootProject.file('..')) {
+        include 'index.html', 'style.css', 'plan.js', 'app.js', 'icons/**'
+    }
+    into webOut.map { it.dir('www') }
+}
+preBuild.dependsOn 'copyWeb'
+
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'com.matthewbrooksmith.legday'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.matthewbrooksmith.legday'
+        minSdk 26
+        targetSdk 34
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+    }
+
+    // A fixed key so each new APK installs as an update over the last one
+    // (keeping your logged data). It only signs this personal sideloaded app.
+    signingConfigs {
+        sideload {
+            storeFile file('../signing/sideload.keystore')
+            storePassword 'legday-sideload'
+            keyAlias 'legday'
+            keyPassword 'legday-sideload'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.sideload
+        }
+        debug {
+            signingConfig signingConfigs.sideload
+        }
+    }
+
+    sourceSets {
+        main.assets.srcDirs += [webOut.get().asFile]
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

@@ -199,7 +199,8 @@
           h.outcomes.map((o) => `<li>${esc(o.name)}: ${o.weight ? fmt(o.weight) + ' kg × ' : ''}${esc(o.results.join(', ') || 'not logged')} <span class="${esc(o.change)}">→ ${esc(o.message)}</span></li>`).join('') +
           '</ul></details>').join('')
       : '';
-    const backup = cloud ? '' : `<section class="panel"><h2>Backup</h2>
+    const inApk = /; wv\)/.test(navigator.userAgent);
+    const backup = cloud || inApk ? '' : `<section class="panel"><h2>Backup</h2>
         <p class="muted small">Your data is saved in this browser only. Export it to move it to another device.</p>
         <div class="grid2"><button type="button" class="secondary" id="export">Export</button>
         <label class="secondary" style="text-align:center;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;cursor:pointer;font:600 18px var(--display);text-transform:uppercase;letter-spacing:.04em">Import<input type="file" id="import" accept="application/json" hidden></label></div></section>`;
