@@ -154,6 +154,8 @@ details.hist ul { font-size: 14px; margin-top: 6px; }
 .t-next { font-size: 12px; opacity: 0.8; margin-top: 2px; }
 
 /* Timers */
+.chipbtn { text-decoration: none; }
+.help { color: var(--accent); font-weight: 600; white-space: nowrap; text-decoration: none; }
 .timer-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .chipbtn { font: 600 14px var(--body); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }
 .timer {

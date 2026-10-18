@@ -125,6 +125,7 @@
         <div class="timer-btns">
           ${ex.unit === 'sec' ? `<button type="button" class="chipbtn" data-hold="${ex.id}" data-min="${ex.min}" data-max="${ex.max}">Start hold</button>` : ''}
           <button type="button" class="chipbtn" data-rest="${ex.restSec}" data-name="${esc(ex.name)}">Rest ${fmtClock(ex.restSec)}</button>
+          <a class="chipbtn" href="${esc(ex.help)}" target="_blank" rel="noopener">Help ▶</a>
         </div></div>
     </article>`;
   }
@@ -147,7 +148,7 @@
     const cur = timer && timer.kind === 'flow' ? timer.step : -1;
     const rows = s.flow.map((p, i) => `<li class="${i === cur ? 'now' : ''}">
         <button type="button" class="pose" data-pose="${i}"><span class="pose-name">${esc(p.name)}${p.sides ? ' <span class="muted small">each side</span>' : ''}</span><span class="pose-min">${p.min} min</span></button>
-        <p class="pose-cue">${esc(p.cue)}</p></li>`).join('');
+        <p class="pose-cue">${esc(p.cue)} <a class="help" href="${esc(P.poseHelp(p.name))}" target="_blank" rel="noopener">Help ▶</a></p></li>`).join('');
     return `${scheduleStrip()}
       <section class="head">
         <span class="eyebrow">Session ${s.index + 1} · ${s.minutes} min</span>
