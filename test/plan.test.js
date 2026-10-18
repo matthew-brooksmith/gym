@@ -125,3 +125,12 @@ test('yoga days are an hour with no lifts, and appear in the upcoming strip', ()
   assert.strictEqual(b.flow.reduce((t, p) => t + p.min, 0), 60);
   assert.deepStrictEqual(P.upcoming(fresh(), 6).map((d) => d.short), ['Legs A', 'Upper A', 'Yoga A', 'Legs B', 'Upper B', 'Yoga B']);
 });
+
+test('every exercise and pose has a YouTube help link', () => {
+  for (const id of Object.keys(P.EXERCISES)) {
+    const url = P.exerciseHelp(id);
+    assert.match(url, /^https:\/\/www\.youtube\.com\/results\?search_query=/);
+    assert.ok(!decodeURIComponent(url).includes('('), id);
+  }
+  assert.match(P.poseHelp('Tree pose'), /Tree%20pose/);
+});

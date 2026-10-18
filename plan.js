@@ -97,6 +97,30 @@
     { name: 'Savasana', min: 7, cue: 'Legs long, a cushion under the knees if comfortable.' },
   ];
   const YOGA_NOTE = 'Avoid hero, child\'s pose, pigeon, lotus and deep lunges.';
+  // YouTube search terms for the Help link. Names with knee limits in
+  // brackets search for the plain movement instead.
+  const HELP_QUERY = {
+    leg_press_shallow: 'leg press partial range knee friendly form',
+    leg_press_heavy: 'leg press partial range knee friendly form',
+    tke: 'cable terminal knee extension VMO',
+    spanish_squat: 'spanish squat isometric patellar',
+    step_up: 'low box step up form',
+    copenhagen: 'short lever copenhagen plank',
+    single_leg_balance: 'single leg balance knee stability exercise',
+    row: 'chest supported row form',
+    pallof: 'pallof press cable form',
+  };
+  function helpUrl(query) {
+    return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
+  }
+  function exerciseHelp(id) {
+    const ex = EXERCISES[id];
+    return helpUrl(HELP_QUERY[id] || (ex.name.replace(/\s*\(.*\)\s*/, ' ').trim() + ' form'));
+  }
+  function poseHelp(name) {
+    return helpUrl(name + ' yoga pose how to');
+  }
+
   const YOGA_A = { id: 'yoga_a', name: 'Yoga: hips & legs', short: 'Yoga A', minutes: 60, exercises: [], flow: YOGA_FLOW, note: YOGA_NOTE };
   const YOGA_B = { id: 'yoga_b', name: 'Yoga: upper body & balance', short: 'Yoga B', minutes: 60, exercises: [], flow: YOGA_FLOW_UPPER, note: YOGA_NOTE };
   const ROTATION = [
@@ -178,6 +202,7 @@
       rest: restFor(ex),
       restSec: restSeconds(ex),
       effort: effortFor(id, ex),
+      help: exerciseHelp(id),
     };
   }
 
@@ -340,7 +365,7 @@
     return out;
   }
 
-  const api = { EXERCISES, ROTATION, estimateWeight, defaultState, syncLifts, setWeight, nextSession, upcoming, progress, completeSession, isDeload, weeklyVolume, nutrition, roundTo };
+  const api = { EXERCISES, ROTATION, estimateWeight, defaultState, syncLifts, setWeight, nextSession, upcoming, progress, completeSession, isDeload, weeklyVolume, nutrition, roundTo, exerciseHelp, poseHelp };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GymPlan = api;
 })(typeof window !== 'undefined' ? window : globalThis);
