@@ -1,348 +1,144 @@
 /*
- * Plan engine: exercise library, starting-weight estimates, progression rules.
- * Pure functions with no DOM access, so it runs in the browser (window.GymPlan)
- * and under Node for tests (module.exports).
+ * Tracker engine: workout days in a fixed order, exercises the user names,
+ * and the weight × reps logged for each set. Pure functions with no DOM
+ * access, so it runs in the browser (window.GymPlan) and under Node for tests.
  */
 (function (root) {
   'use strict';
 
-  // kneeNote explains why a movement is in (or how to keep it knee-safe).
-  // ratio: starting load as a fraction of body mass when no weight is entered.
-  // perHand: the weight is per dumbbell. unit: 'reps' or 'sec'.
-  // increment 0 means unloaded/band work: progress by adding reps/seconds.
-  const EXERCISES = {
-    hip_thrust: { name: 'Barbell hip thrust', group: 'glutes', sets: 4, min: 8, max: 12, increment: 5, ratio: 1.0,
-      kneeNote: 'Knees stay at ~90° and do not move under load. Main glute builder.' },
-    rdl: { name: 'Romanian deadlift', group: 'hamstrings', sets: 4, min: 8, max: 10, increment: 5, ratio: 0.8,
-      kneeNote: 'Soft, fixed knee bend; all movement is at the hip.' },
-    leg_press_shallow: { name: 'Leg press (stop at ~60° knee bend)', group: 'quads', sets: 3, min: 10, max: 15, increment: 10, ratio: 1.5,
-      kneeNote: 'Closed-chain and guided. Set the stops or depth so knees never pass ~60°; feet higher on the plate shifts work to glutes.' },
-    leg_press_heavy: { name: 'Leg press, heavier (stop at ~60° knee bend)', group: 'quads', sets: 4, min: 8, max: 12, increment: 10, ratio: 1.8,
-      kneeNote: 'Same shallow range as day A, heavier load. Stop the set if the kneecap feels unsteady.' },
-    leg_curl: { name: 'Seated leg curl', group: 'hamstrings', sets: 4, min: 10, max: 15, increment: 2.5, ratio: 0.35,
-      kneeNote: 'Machine-guided and unloaded through the joint; hamstrings help stabilise the knee.' },
-    calf_standing: { name: 'Standing calf raise', group: 'calves', sets: 4, min: 10, max: 15, increment: 5, ratio: 0.8,
-      kneeNote: 'Straight knees.' },
-    calf_seated: { name: 'Seated calf raise', group: 'calves', sets: 3, min: 12, max: 20, increment: 5, ratio: 0.5,
-      kneeNote: 'Knees fixed at 90° with no movement.' },
-    tke: { name: 'Cable terminal knee extension (VMO)', group: 'knee stability', sets: 3, min: 15, max: 20, increment: 2.5, ratio: 0.2,
-      kneeNote: 'Face the stack with the strap behind your knee, straighten the last ~30° and squeeze the inner quad (VMO) for 1–2s. A band works too if no cable is free.' },
-    spanish_squat: { name: 'Spanish squat isometric (45–60°)', group: 'quads', sets: 4, min: 30, max: 45, unit: 'sec', increment: 0, ratio: 0,
-      kneeNote: 'Strap behind the knees, sit back to a fixed shallow angle and hold. Builds quad/VMO strength with very little shear on the kneecap.' },
-    step_up: { name: 'Low-box step-up (knee ≤ 60°)', group: 'quads', sets: 3, min: 10, max: 12, increment: 2, ratio: 0.15, perHand: true,
-      kneeNote: 'Box about mid-shin height. Drive through the whole foot and keep the knee tracking over the 2nd toe; no caving inward.' },
-    hip_abduction: { name: 'Cable hip abduction', group: 'glutes', sets: 3, min: 12, max: 20, increment: 2.5, ratio: 0.12,
-      kneeNote: 'Ankle strap, standing leg soft and still. Glute med strength stops the knee collapsing inward, the main cause of kneecap instability under load.' },
-    cable_adduction: { name: 'Cable hip adduction', group: 'adductors', sets: 3, min: 12, max: 15, increment: 2.5, ratio: 0.15,
-      kneeNote: 'Ankle strap, straight working leg. Adductors add a lot of inner-thigh size and help control the knee side to side.' },
-    cable_pull_through: { name: 'Cable pull-through', group: 'glutes', sets: 3, min: 10, max: 15, increment: 2.5, ratio: 0.35,
-      kneeNote: 'Rope between the legs, hinge at the hips with a soft, fixed knee bend, then drive the hips forward.' },
-    cable_kickback: { name: 'Cable glute kickback', group: 'glutes', sets: 3, min: 12, max: 15, increment: 2.5, ratio: 0.1,
-      kneeNote: 'Ankle strap, kick back and slightly out with the knee kept at one fixed angle.' },
-    copenhagen: { name: 'Copenhagen plank (short lever, knee on bench)', group: 'adductors', sets: 3, min: 20, max: 40, unit: 'sec', increment: 0, ratio: 0,
-      kneeNote: 'Adductors help control the knee in the frontal plane. Start with the knee on the bench, not the ankle.' },
-    single_leg_balance: { name: 'Single-leg balance, soft knee', group: 'knee stability', sets: 2, min: 30, max: 60, unit: 'sec', increment: 0, ratio: 0,
-      kneeNote: 'Proprioception for knee control. Progress to eyes closed or an unstable pad once 60s is easy.' },
-
-    bench: { name: 'Bench press', group: 'chest', sets: 4, min: 6, max: 10, increment: 2.5, ratio: 0.75 },
-    incline_db: { name: 'Incline dumbbell press', group: 'chest', sets: 3, min: 8, max: 12, increment: 2, ratio: 0.25, perHand: true },
-    row: { name: 'Chest-supported row', group: 'back', sets: 4, min: 8, max: 12, increment: 2.5, ratio: 0.6 },
-    cable_row: { name: 'Seated cable row', group: 'back', sets: 3, min: 10, max: 12, increment: 2.5, ratio: 0.55 },
-    pulldown: { name: 'Lat pulldown', group: 'back', sets: 3, min: 8, max: 12, increment: 2.5, ratio: 0.6 },
-    ohp: { name: 'Seated dumbbell shoulder press', group: 'shoulders', sets: 3, min: 8, max: 12, increment: 2, ratio: 0.2, perHand: true },
-    lateral_raise: { name: 'Dumbbell lateral raise', group: 'shoulders', sets: 3, min: 12, max: 20, increment: 1, ratio: 0.08, perHand: true },
-    face_pull: { name: 'Cable face pull', group: 'shoulders', sets: 3, min: 12, max: 20, increment: 2.5, ratio: 0.2 },
-    triceps: { name: 'Triceps rope pushdown', group: 'arms', sets: 3, min: 10, max: 15, increment: 2.5, ratio: 0.3 },
-    curl: { name: 'Dumbbell curl', group: 'arms', sets: 3, min: 8, max: 12, increment: 1, ratio: 0.12, perHand: true },
-    pallof: { name: 'Pallof press', group: 'core', sets: 3, min: 10, max: 15, increment: 2.5, ratio: 0.15 },
-    cable_crunch: { name: 'Cable crunch', group: 'core', sets: 3, min: 10, max: 15, increment: 2.5, ratio: 0.4 },
-  };
-
-  // Sessions rotate in this order regardless of how many days a week you train.
-  // Yoga follows each upper day, so there is always a lighter day before legs.
-  // Hip flexibility and leg mobility, kept knee-safe: no kneeling on the
-  // kneecap, no deep loaded knee bend, no twisting through a bent knee.
-  // `sides` poses switch legs halfway through.
-  const YOGA_FLOW = [
-    { name: 'Cat-cow', min: 3, cue: 'On hands and knees with padding under the knees. Slow spine waves.' },
-    { name: 'Standing hip flexor stretch', min: 6, sides: true, cue: 'Short split stance, back leg straight, tuck the pelvis and squeeze the back glute.' },
-    { name: 'Pyramid pose', min: 4, sides: true, cue: 'Both legs straight but not locked, hinge over the front leg.' },
-    { name: 'Wide-leg forward fold', min: 4, cue: 'Feet wide, knees soft, hands to blocks or floor.' },
-    { name: 'Tree pose', min: 4, sides: true, cue: 'Standing knee soft, foot on the calf (never the knee).' },
-    { name: 'Bridge holds', min: 4, cue: '30 s holds with short rests. Knees in line with the hips.' },
-    { name: 'Strap hamstring stretch', min: 6, sides: true, cue: 'On your back, strap round the foot, leg straight up.' },
-    { name: 'Reclined figure-four', min: 6, sides: true, cue: 'Ankle over the opposite thigh, hands behind the thigh, not the shin.' },
-    { name: 'Strap leg to the side', min: 4, sides: true, cue: 'On your back, straight leg lowered out to the side for the inner thigh.' },
-    { name: 'Supported butterfly', min: 4, cue: 'On your back, soles together, blocks or cushions under both knees.' },
-    { name: 'Supine twist, top leg straight', min: 4, sides: true, cue: 'Straight top leg across the body; knees never bent and twisted.' },
-    { name: 'Legs up the wall, wide', min: 5, cue: 'Let the legs fall open into a straddle.' },
-    { name: 'Savasana', min: 6, cue: 'Legs long, a cushion under the knees if comfortable.' },
-  ];
-  // Shoulders, chest, spine and balance, with lighter hip work so the week stays even.
-  const YOGA_FLOW_UPPER = [
-    { name: 'Cat-cow', min: 3, cue: 'On hands and knees with padding under the knees. Slow spine waves.' },
-    { name: 'Thread the needle', min: 4, sides: true, cue: 'From hands and knees, slide one arm under and rest the shoulder down.' },
-    { name: 'Standing side bend', min: 3, cue: 'Arms overhead, lean one way then the other, legs straight.' },
-    { name: 'Chest opener, hands clasped behind', min: 3, cue: 'Standing, lift the clasped hands away from the back.' },
-    { name: 'Eagle arms', min: 4, sides: true, cue: 'Standing tall, legs straight; wrap the arms only.' },
-    { name: 'Puppy pose at the wall', min: 4, cue: 'Hands high on the wall, hinge at the hips and let the chest sink.' },
-    { name: 'Tree pose', min: 4, sides: true, cue: 'Standing knee soft, foot on the calf (never the knee).' },
-    { name: 'Warrior III, hands on the wall', min: 4, sides: true, cue: 'Hinge forward on one leg, standing knee soft, back leg in line with the body.' },
-    { name: 'Half moon at the wall', min: 4, sides: true, cue: 'Back against the wall, both legs straight, hand on a block.' },
-    { name: 'Doorway chest stretch', min: 4, sides: true, cue: 'Forearm on the frame at shoulder height, turn away gently.' },
-    { name: 'Sphinx', min: 4, cue: 'Lying on the front, forearms down, lift the chest.' },
-    { name: 'Floor angels', min: 4, cue: 'On your back, arms in a W, slide them up and down the floor.' },
-    { name: 'Strap hamstring stretch', min: 4, sides: true, cue: 'On your back, strap round the foot, leg straight up.' },
-    { name: 'Supine twist, top leg straight', min: 4, sides: true, cue: 'Straight top leg across the body; knees never bent and twisted.' },
-    { name: 'Savasana', min: 7, cue: 'Legs long, a cushion under the knees if comfortable.' },
-  ];
-  const YOGA_NOTE = 'Avoid hero, child\'s pose, pigeon, lotus and deep lunges.';
-  // YouTube search terms for the Help link. Names with knee limits in
-  // brackets search for the plain movement instead.
-  const HELP_QUERY = {
-    leg_press_shallow: 'leg press partial range knee friendly form',
-    leg_press_heavy: 'leg press partial range knee friendly form',
-    tke: 'cable terminal knee extension VMO',
-    spanish_squat: 'spanish squat isometric patellar',
-    step_up: 'low box step up form',
-    copenhagen: 'short lever copenhagen plank',
-    single_leg_balance: 'single leg balance knee stability exercise',
-    row: 'chest supported row form',
-    pallof: 'pallof press cable form',
-  };
-  function helpUrl(query) {
-    return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
-  }
-  function exerciseHelp(id) {
-    const ex = EXERCISES[id];
-    return helpUrl(HELP_QUERY[id] || (ex.name.replace(/\s*\(.*\)\s*/, ' ').trim() + ' form'));
-  }
-  function poseHelp(name) {
-    return helpUrl(name + ' yoga pose how to');
-  }
-
-  const YOGA_A = { id: 'yoga_a', name: 'Yoga: hips & legs', short: 'Yoga A', minutes: 60, exercises: [], flow: YOGA_FLOW, note: YOGA_NOTE };
-  const YOGA_B = { id: 'yoga_b', name: 'Yoga: upper body & balance', short: 'Yoga B', minutes: 60, exercises: [], flow: YOGA_FLOW_UPPER, note: YOGA_NOTE };
-  const ROTATION = [
-    { id: 'lower_a', short: 'Legs A', name: 'Lower A: glutes & hamstrings',
-      exercises: ['hip_thrust', 'rdl', 'leg_press_shallow', 'leg_curl', 'hip_abduction', 'cable_adduction', 'calf_standing', 'tke'] },
-    { id: 'upper_a', short: 'Upper A', name: 'Upper A: horizontal push & pull',
-      exercises: ['bench', 'row', 'ohp', 'pulldown', 'lateral_raise', 'triceps', 'pallof'] },
-    YOGA_A,
-    { id: 'lower_b', short: 'Legs B', name: 'Lower B: knee-safe quads & stability',
-      exercises: ['spanish_squat', 'leg_press_heavy', 'step_up', 'cable_pull_through', 'cable_kickback', 'copenhagen', 'calf_seated', 'tke', 'single_leg_balance'] },
-    { id: 'upper_b', short: 'Upper B', name: 'Upper B: incline, back & arms',
-      exercises: ['incline_db', 'cable_row', 'pulldown', 'face_pull', 'curl', 'triceps', 'cable_crunch'] },
-    YOGA_B,
-  ];
-
-  // Every 6th pass through the rotation is a deload: half the sets, same weights.
-  const DELOAD_EVERY = 36;
-  const DELOAD_LENGTH = 6;
-  const STRIKES_TO_DELOAD = 2;
-  const DELOAD_FACTOR = 0.9;
-  const UNLOADED_STEP = { reps: 2, sec: 5 };
-
-  function roundTo(value, step) {
-    if (!step) return Math.round(value);
-    return Math.round(Math.round(value / step) * step * 100) / 100;
-  }
-
-  function estimateWeight(id, bodyMass) {
-    const ex = EXERCISES[id];
-    if (!ex.increment || !bodyMass) return 0;
-    return Math.max(ex.increment, roundTo(bodyMass * ex.ratio, ex.increment));
-  }
+  const DEFAULT_DAYS = ['Legs A', 'Upper A', 'Legs B', 'Upper B'];
+  const DEFAULT_SETS = 3;
+  const HISTORY_CAP = 500;
+  // Old plan ids → day names, for carrying v1 history over.
+  const V1_DAYS = { lower_a: 'Legs A', upper_a: 'Upper A', lower_b: 'Legs B', upper_b: 'Upper B' };
+  // v1 rotation had 6 slots (yoga at 2 and 5); map each to the next lifting day.
+  const V1_SLOT_TO_DAY = [0, 1, 2, 2, 3, 0];
 
   function defaultState() {
-    return { profile: { bodyMass: 75, height: 178, age: null, sex: '' }, lifts: {}, sessionCount: 0, history: [] };
+    return { version: 2, profile: { bodyMass: 75, height: 178, age: null, sex: '' }, days: DEFAULT_DAYS.slice(), dayIndex: 0, history: [] };
   }
 
-  // Fill in any lift the user hasn't set from body mass. Estimates are refreshed
-  // when body mass changes; weights the user entered or earned are kept.
-  function syncLifts(state) {
-    const lifts = Object.assign({}, state.lifts);
-    for (const id of Object.keys(EXERCISES)) {
-      const cur = lifts[id];
-      if (!cur || cur.source === 'estimate') {
-        lifts[id] = Object.assign({ bonus: 0, strikes: 0 }, cur, {
-          weight: estimateWeight(id, state.profile.bodyMass),
-          source: 'estimate',
-        });
-      }
+  const num = (v) => (v === '' || v === null || v === undefined || isNaN(Number(v)) ? null : Number(v));
+  const cleanName = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+  const sameName = (a, b) => cleanName(a).toLowerCase() === cleanName(b).toLowerCase();
+
+  // Accept anything stored (v2, a v1 plan, a backup file) and return a v2 state.
+  function migrate(raw) {
+    const base = defaultState();
+    if (!raw || typeof raw !== 'object') return base;
+    if (raw.version === 2) {
+      const s = Object.assign(base, raw);
+      s.profile = Object.assign(defaultState().profile, raw.profile);
+      if (!Array.isArray(s.days) || !s.days.length) s.days = DEFAULT_DAYS.slice();
+      s.dayIndex = ((Number(s.dayIndex) || 0) % s.days.length + s.days.length) % s.days.length;
+      s.history = Array.isArray(s.history) ? s.history : [];
+      return s;
     }
-    return Object.assign({}, state, { lifts });
-  }
-
-  function setWeight(state, id, weight) {
-    const lifts = Object.assign({}, state.lifts);
-    lifts[id] = Object.assign({ bonus: 0, strikes: 0 }, lifts[id], { weight: Number(weight) || 0, source: 'user', strikes: 0 });
-    return Object.assign({}, state, { lifts });
-  }
-
-  function isDeload(sessionCount) {
-    return sessionCount % DELOAD_EVERY >= DELOAD_EVERY - DELOAD_LENGTH;
-  }
-
-  function targetFor(id, lift, deload) {
-    const ex = EXERCISES[id];
-    const bonus = (lift && lift.bonus) || 0;
-    return {
-      id,
-      name: ex.name,
-      group: ex.group,
-      unit: ex.unit || 'reps',
-      sets: deload ? Math.ceil(ex.sets / 2) : ex.sets,
-      min: ex.min + bonus,
-      max: ex.max + bonus,
-      weight: lift ? lift.weight : 0,
-      perHand: !!ex.perHand,
-      loaded: ex.increment > 0,
-      kneeNote: ex.kneeNote || '',
-      rest: restFor(ex),
-      restSec: restSeconds(ex),
-      effort: effortFor(id, ex),
-      help: exerciseHelp(id),
-    };
-  }
-
-  // Hypertrophy guidance: heavier, lower-rep work needs longer rest to keep
-  // the next set productive; isolation work recovers faster.
-  // Default countdown for the rest timer, inside the ranges above.
-  function restSeconds(ex) {
-    if (ex.unit === 'sec') return 60;
-    return ex.min <= 8 ? 150 : 75;
-  }
-
-  function restFor(ex) {
-    if (ex.unit === 'sec') return '60 s';
-    return ex.min <= 8 ? '2–3 min' : '60–90 s';
-  }
-
-  // How close to failure to take each set. Knee-loaded movements stay further
-  // from failure so form never breaks down around the kneecap.
-  const KNEE_LOADED = ['leg_press_shallow', 'leg_press_heavy', 'step_up', 'spanish_squat'];
-  function effortFor(id, ex) {
-    if (ex.unit === 'sec' || !ex.increment) return 'Controlled, full squeeze each rep';
-    if (KNEE_LOADED.includes(id)) return 'Stop 2 reps before failure, never grind';
-    if (ex.min <= 8) return 'Stop 1–2 reps before failure';
-    return 'Last set to 0–1 reps before failure';
-  }
-
-  // The next n sessions from the current one, for the schedule strip.
-  function upcoming(state, n) {
-    return Array.from({ length: n }, (_, i) => {
-      const idx = state.sessionCount + i;
-      const day = ROTATION[idx % ROTATION.length];
-      return { index: idx, id: day.id, short: day.short, deload: isDeload(idx) };
+    const history = [];
+    for (const h of raw.history || []) {
+      const day = V1_DAYS[h.session];
+      if (!day) continue;
+      const entries = (h.outcomes || [])
+        .filter((o) => o.results && o.results.length)
+        .map((o) => ({ name: o.name, sets: o.results.map((r) => ({ kg: num(o.weight), reps: num(r) })) }));
+      if (entries.length) history.push({ date: h.date, day, entries });
+    }
+    return Object.assign(base, {
+      profile: Object.assign(base.profile, raw.profile),
+      history,
+      dayIndex: V1_SLOT_TO_DAY[(Number(raw.sessionCount) || 0) % 6],
     });
   }
 
-  function nextSession(state) {
-    const day = ROTATION[state.sessionCount % ROTATION.length];
-    const deload = isDeload(state.sessionCount);
-    return {
-      index: state.sessionCount,
-      id: day.id,
-      name: day.name,
-      minutes: day.minutes || null,
-      note: day.note || '',
-      flow: day.flow || null,
-      deload,
-      exercises: day.exercises.map((id) => targetFor(id, state.lifts[id], deload)),
-    };
+  // Every exercise name ever logged, most recently used first.
+  function exerciseNames(state) {
+    const out = [];
+    for (const h of state.history) for (const e of h.entries) if (!out.some((n) => sameName(n, e.name))) out.push(e.name);
+    return out;
   }
 
-  // Double progression. results[i] is reps (or seconds) achieved on set i.
-  //  - every set at the top of the range  -> add load (or reps/seconds if unloaded)
-  //  - any set below the bottom of range  -> a strike; 2 strikes in a row -> drop 10%
-  //  - otherwise                          -> same weight, aim for more reps
-  // `used` is the weight actually lifted, when it differs from the suggestion.
-  function progress(id, current, results, used) {
-    const ex = EXERCISES[id];
-    const lift = Object.assign({}, current);
-    if (ex.increment && Number(used) > 0 && Number(used) !== lift.weight) {
-      Object.assign(lift, { weight: Number(used), source: 'user', strikes: 0 });
+  // The last logged attempt at an exercise: { date, day, sets }.
+  function lastFor(state, name) {
+    for (const h of state.history) {
+      const e = h.entries.find((x) => sameName(x.name, name));
+      if (e) return { date: h.date, day: h.day, sets: e.sets };
     }
-    const t = targetFor(id, lift, false);
-    const done = results.filter((r) => r !== null && r !== undefined && r !== '').map(Number);
-    const next = Object.assign({}, lift);
-    if (done.length < ex.sets) return { lift: next, change: 'incomplete', message: 'Not all sets logged, holding.' };
-
-    if (done.every((r) => r >= t.max)) {
-      next.strikes = 0;
-      next.source = 'progressed';
-      if (ex.increment) {
-        next.weight = roundTo(lift.weight + ex.increment, ex.increment);
-        return { lift: next, change: 'up', message: `+${ex.increment} kg${ex.perHand ? ' per hand' : ''} → ${next.weight} kg` };
-      }
-      const step = UNLOADED_STEP[t.unit];
-      next.bonus = (lift.bonus || 0) + step;
-      return { lift: next, change: 'up', message: `Target now ${t.min + step}–${t.max + step} ${t.unit}` };
-    }
-
-    if (done.some((r) => r < t.min)) {
-      next.strikes = (lift.strikes || 0) + 1;
-      if (next.strikes >= STRIKES_TO_DELOAD) {
-        next.strikes = 0;
-        next.source = 'progressed';
-        if (ex.increment) {
-          next.weight = Math.max(ex.increment, roundTo(lift.weight * DELOAD_FACTOR, ex.increment));
-          return { lift: next, change: 'down', message: `Missed twice, reset to ${next.weight} kg` };
-        }
-        next.bonus = Math.max(0, (lift.bonus || 0) - UNLOADED_STEP[t.unit]);
-        return { lift: next, change: 'down', message: 'Missed twice, target eased' };
-      }
-      return { lift: next, change: 'hold', message: 'Below range, same target next time' };
-    }
-
-    next.strikes = 0;
-    return { lift: next, change: 'hold', message: 'In range, same weight, chase more reps' };
+    return null;
   }
 
-  // Apply a whole session's log and advance the rotation.
-  // log: { [exerciseId]: { reps: number[], weight?: number } } (a bare reps array also works)
-  function completeSession(state, log, date) {
-    const session = nextSession(state);
-    const day = date || new Date().toISOString().slice(0, 10);
-    const lifts = Object.assign({}, state.lifts);
-    const outcomes = [];
-    for (const ex of session.exercises) {
-      const entry = Array.isArray(log[ex.id]) ? { reps: log[ex.id] } : (log[ex.id] || {});
-      const results = (entry.reps || []).filter((r) => r !== null && r !== undefined && r !== '').map(Number);
-      let out;
-      if (session.deload) {
-        const lift = Object.assign({}, lifts[ex.id]);
-        if (ex.loaded && Number(entry.weight) > 0) Object.assign(lift, { weight: Number(entry.weight), source: 'user' });
-        out = { lift, change: 'hold', message: 'Deload week, same target next time' };
-      } else {
-        out = progress(ex.id, lifts[ex.id], results, entry.weight);
+  // Heaviest set and when it was done.
+  function bestFor(state, name) {
+    let best = null;
+    for (const h of state.history) {
+      const e = h.entries.find((x) => sameName(x.name, name));
+      if (!e) continue;
+      for (const s of e.sets) {
+        if (s.kg != null && (!best || s.kg > best.kg || (s.kg === best.kg && (s.reps || 0) > (best.reps || 0)))) best = { kg: s.kg, reps: s.reps, date: h.date };
       }
-      const used = ex.loaded ? (Number(entry.weight) > 0 ? Number(entry.weight) : lifts[ex.id].weight) : null;
-      if (results.length) {
-        if (out.lift.source === 'estimate') out.lift.source = 'logged';
-        out.lift.last = { date: day, weight: used, results, unit: ex.unit, change: out.change, message: out.message };
-      }
-      lifts[ex.id] = out.lift;
-      outcomes.push({ id: ex.id, name: ex.name, change: out.change, message: out.message, results, weight: used, next: out.lift.weight });
     }
-    const record = { date: day, session: session.id, name: session.name, deload: session.deload, outcomes };
-    return {
-      state: Object.assign({}, state, { lifts, sessionCount: state.sessionCount + 1, history: [record].concat(state.history).slice(0, 60) }),
-      outcomes,
-    };
+    return best;
   }
 
-  // Hard sets per muscle group across one full rotation (≈ one week at 4 sessions/week).
-  function weeklyVolume() {
-    const vol = {};
-    for (const day of ROTATION) {
-      for (const id of day.exercises) {
-        const g = EXERCISES[id].group;
-        vol[g] = (vol[g] || 0) + EXERCISES[id].sets;
-      }
-    }
-    return vol;
+  const emptySets = (n) => Array.from({ length: n }, () => ({ kg: null, reps: null }));
+
+  function entryFor(state, name) {
+    const last = lastFor(state, name);
+    return { name: cleanName(name), sets: emptySets(last ? last.sets.length : DEFAULT_SETS) };
+  }
+
+  // A new day starts with the exercises done last time on that day, in the same order.
+  function templateFor(state, dayName) {
+    const h = state.history.find((x) => x.day === dayName);
+    return h ? h.entries.map((e) => entryFor(state, e.name)) : [];
+  }
+
+  function currentDay(state) {
+    return state.days[state.dayIndex % state.days.length];
+  }
+
+  // The session being logged: the saved draft, or a fresh one from the template.
+  function draftFor(state) {
+    const day = currentDay(state);
+    if (state.draft && state.draft.day === day && state.draft.dayIndex === state.dayIndex) return state.draft;
+    return { day, dayIndex: state.dayIndex, entries: templateFor(state, day) };
+  }
+
+  function addExercise(draft, state, name) {
+    const n = cleanName(name);
+    if (!n || draft.entries.some((e) => sameName(e.name, n))) return draft;
+    const known = exerciseNames(state).find((x) => sameName(x, n));
+    return Object.assign({}, draft, { entries: draft.entries.concat(entryFor(state, known || n)) });
+  }
+
+  function upcoming(state, n) {
+    return Array.from({ length: n }, (_, i) => state.days[(state.dayIndex + i) % state.days.length]);
+  }
+
+  // Save the session (sets with nothing typed are dropped) and move to the next day.
+  function finishSession(state, draft, date) {
+    const entries = draft.entries
+      .map((e) => ({ name: cleanName(e.name), sets: e.sets.map((s) => ({ kg: num(s.kg), reps: num(s.reps) })).filter((s) => s.reps != null) }))
+      .filter((e) => e.name && e.sets.length);
+    const history = entries.length
+      ? [{ date: date || new Date().toISOString().slice(0, 10), day: draft.day, entries }].concat(state.history).slice(0, HISTORY_CAP)
+      : state.history;
+    const next = Object.assign({}, state, { history, dayIndex: (state.dayIndex + 1) % state.days.length });
+    delete next.draft;
+    return next;
+  }
+
+  function setDays(state, names) {
+    const days = names.map(cleanName).filter(Boolean);
+    if (!days.length) return state;
+    const cur = currentDay(state);
+    const idx = days.indexOf(cur);
+    const next = Object.assign({}, state, { days, dayIndex: idx >= 0 ? idx : 0 });
+    delete next.draft;
+    return next;
+  }
+
+  function helpUrl(name) {
+    return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanName(name) + ' form');
   }
 
   function nutrition(profile) {
@@ -365,7 +161,7 @@
     return out;
   }
 
-  const api = { EXERCISES, ROTATION, estimateWeight, defaultState, syncLifts, setWeight, nextSession, upcoming, progress, completeSession, isDeload, weeklyVolume, nutrition, roundTo, exerciseHelp, poseHelp };
+  const api = { DEFAULT_DAYS, defaultState, migrate, exerciseNames, lastFor, bestFor, templateFor, currentDay, draftFor, addExercise, upcoming, finishSession, setDays, helpUrl, nutrition };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GymPlan = api;
 })(typeof window !== 'undefined' ? window : globalThis);

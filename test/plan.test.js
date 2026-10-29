@@ -2,83 +2,84 @@ const test = require('node:test');
 const assert = require('node:assert');
 const P = require('../plan.js');
 
-const fresh = () => P.syncLifts(P.defaultState());
+const log = (state, entries, date) => {
+  let d = P.draftFor(state);
+  for (const e of entries) d = P.addExercise(d, state, e.name);
+  d.entries.forEach((x, i) => { x.sets = entries[i].sets.map((s) => Object.assign({}, s)); });
+  return P.finishSession(state, d, date);
+};
 
-test('estimates fill every lift and follow body mass', () => {
-  let s = fresh();
-  assert.strictEqual(s.lifts.hip_thrust.weight, 75);
-  s.profile.bodyMass = 90;
-  s = P.syncLifts(s);
-  assert.strictEqual(s.lifts.hip_thrust.weight, 90);
+test('days run in a fixed order and wrap around', () => {
+  let s = P.defaultState();
+  assert.deepStrictEqual(P.upcoming(s, 5), ['Legs A', 'Upper A', 'Legs B', 'Upper B', 'Legs A']);
+  s = P.finishSession(s, P.draftFor(s));
+  assert.strictEqual(P.currentDay(s), 'Upper A');
+  assert.strictEqual(s.history.length, 0, 'an empty session is skipped, not saved');
 });
 
-test('user-entered weights survive a body mass change', () => {
-  let s = P.setWeight(fresh(), 'bench', 82.5);
-  s.profile.bodyMass = 60;
-  s = P.syncLifts(s);
-  assert.strictEqual(s.lifts.bench.weight, 82.5);
+test('logged sets are saved and empty rows dropped', () => {
+  const s = log(P.defaultState(), [{ name: 'Hip thrust', sets: [{ kg: 100, reps: 10 }, { kg: 100, reps: 9 }, { kg: null, reps: null }] }], '2026-10-29');
+  assert.deepStrictEqual(s.history[0], { date: '2026-10-29', day: 'Legs A', entries: [{ name: 'Hip thrust', sets: [{ kg: 100, reps: 10 }, { kg: 100, reps: 9 }] }] });
+  assert.deepStrictEqual(P.exerciseNames(s), ['Hip thrust']);
+  assert.strictEqual(P.lastFor(s, 'hip THRUST').sets.length, 2);
 });
 
-test('hitting the top of the range on every set adds load', () => {
-  const s = P.setWeight(fresh(), 'hip_thrust', 100);
-  const out = P.progress('hip_thrust', s.lifts.hip_thrust, [12, 12, 12, 12]);
-  assert.strictEqual(out.change, 'up');
-  assert.strictEqual(out.lift.weight, 105);
+test('a day starts with the exercises from last time on that day', () => {
+  let s = log(P.defaultState(), [{ name: 'Leg press', sets: [{ kg: 120, reps: 12 }] }, { name: 'Calf raise', sets: [{ kg: 60, reps: 15 }, { kg: 60, reps: 14 }] }]);
+  for (let i = 0; i < 3; i++) s = P.finishSession(s, P.draftFor(s));
+  assert.strictEqual(P.currentDay(s), 'Legs A');
+  const d = P.draftFor(s);
+  assert.deepStrictEqual(d.entries.map((e) => e.name), ['Leg press', 'Calf raise']);
+  assert.strictEqual(d.entries[1].sets.length, 2);
+  assert.ok(d.entries.every((e) => e.sets.every((x) => x.kg === null && x.reps === null)));
 });
 
-test('in range holds weight', () => {
-  const s = P.setWeight(fresh(), 'hip_thrust', 100);
-  const out = P.progress('hip_thrust', s.lifts.hip_thrust, [12, 11, 10, 9]);
-  assert.strictEqual(out.change, 'hold');
-  assert.strictEqual(out.lift.weight, 100);
+test('adding an existing name reuses its spelling and ignores duplicates', () => {
+  const s = log(P.defaultState(), [{ name: 'Lat pulldown', sets: [{ kg: 50, reps: 10 }] }]);
+  let d = P.addExercise(P.draftFor(s), s, '  lat   PULLDOWN ');
+  d = P.addExercise(d, s, 'Lat pulldown');
+  assert.deepStrictEqual(d.entries.map((e) => e.name), ['Lat pulldown']);
 });
 
-test('two misses in a row drop 10%', () => {
-  const s = P.setWeight(fresh(), 'bench', 80);
-  const a = P.progress('bench', s.lifts.bench, [5, 5, 4, 4]);
-  assert.strictEqual(a.lift.weight, 80);
-  const b = P.progress('bench', a.lift, [5, 5, 4, 4]);
-  assert.strictEqual(b.change, 'down');
-  assert.strictEqual(b.lift.weight, 72.5);
+test('best set is the heaviest', () => {
+  let s = log(P.defaultState(), [{ name: 'Bench', sets: [{ kg: 60, reps: 10 }] }], '2026-10-01');
+  s = log(s, [{ name: 'Bench', sets: [{ kg: 65, reps: 6 }, { kg: 60, reps: 8 }] }], '2026-10-05');
+  assert.deepStrictEqual(P.bestFor(s, 'Bench'), { kg: 65, reps: 6, date: '2026-10-05' });
 });
 
-test('unloaded holds progress by seconds', () => {
-  const s = fresh();
-  const out = P.progress('spanish_squat', s.lifts.spanish_squat, [45, 45, 45, 45]);
-  assert.strictEqual(out.lift.bonus, 5);
-  const t = P.nextSession(Object.assign({}, s, { sessionCount: 3, lifts: Object.assign({}, s.lifts, { spanish_squat: out.lift }) }));
-  const sq = t.exercises.find((e) => e.id === 'spanish_squat');
-  assert.strictEqual(sq.min, 35);
-  assert.strictEqual(sq.max, 50);
+test('v1 plan history carries over and yoga is dropped', () => {
+  const v1 = {
+    profile: { bodyMass: 80, height: 180 },
+    sessionCount: 5,
+    lifts: {},
+    history: [
+      { date: '2026-10-20', session: 'yoga_b', name: 'Yoga', outcomes: [] },
+      { date: '2026-10-18', session: 'lower_b', name: 'Lower B', outcomes: [
+        { name: 'Spanish squat isometric (45–60°)', results: [40, 40], weight: null },
+        { name: 'Low-box step-up (knee ≤ 60°)', results: [], weight: 20 },
+      ] },
+      { date: '2026-10-15', session: 'lower_a', name: 'Lower A', outcomes: [{ name: 'Barbell hip thrust', results: [12, 11], weight: 90 }] },
+    ],
+  };
+  const s = P.migrate(v1);
+  assert.strictEqual(s.version, 2);
+  assert.strictEqual(s.profile.bodyMass, 80);
+  assert.strictEqual(s.history.length, 2);
+  assert.deepStrictEqual(s.history[1].entries[0], { name: 'Barbell hip thrust', sets: [{ kg: 90, reps: 12 }, { kg: 90, reps: 11 }] });
+  assert.deepStrictEqual(P.exerciseNames(s), ['Spanish squat isometric (45–60°)', 'Barbell hip thrust']);
+  assert.strictEqual(P.currentDay(s), 'Legs A');
 });
 
-test('rotation alternates lower and upper and advances', () => {
-  let s = fresh();
-  const ids = [];
-  for (let i = 0; i < 7; i++) { ids.push(P.nextSession(s).id); s = P.completeSession(s, {}).state; }
-  assert.deepStrictEqual(ids, ['lower_a', 'upper_a', 'yoga_a', 'lower_b', 'upper_b', 'yoga_b', 'lower_a']);
+test('days can be renamed and reordered', () => {
+  let s = P.defaultState();
+  s = P.finishSession(s, P.draftFor(s));
+  s = P.setDays(s, ['Push', 'Pull', ' ', 'Upper A', 'Legs']);
+  assert.deepStrictEqual(s.days, ['Push', 'Pull', 'Upper A', 'Legs']);
+  assert.strictEqual(P.currentDay(s), 'Upper A');
 });
 
-test('deload weeks halve sets and do not progress', () => {
-  let s = P.setWeight(fresh(), 'hip_thrust', 100);
-  s.sessionCount = 30;
-  const sess = P.nextSession(s);
-  assert.ok(sess.deload);
-  assert.strictEqual(sess.exercises[0].sets, 2);
-  const r = P.completeSession(s, { hip_thrust: [12, 12] });
-  assert.strictEqual(r.state.lifts.hip_thrust.weight, 100);
-  assert.ok(!P.isDeload(36));
-});
-
-test('legs get more weekly sets than any upper group', () => {
-  const v = P.weeklyVolume();
-  const legs = v.quads + v.glutes + v.hamstrings + v.calves + v.adductors;
-  assert.ok(legs > v.chest + v.back);
-});
-
-test('no deep knee-flexion movements in the library', () => {
-  const names = Object.values(P.EXERCISES).map((e) => e.name.toLowerCase()).join(' ');
-  for (const bad of ['back squat', 'front squat', 'lunge', 'pistol', 'jump', 'sissy', 'hack squat']) assert.ok(!names.includes(bad), bad);
+test('help links search YouTube for the exercise', () => {
+  assert.strictEqual(P.helpUrl('Hip thrust'), 'https://www.youtube.com/results?search_query=Hip%20thrust%20form');
 });
 
 test('nutrition', () => {
@@ -86,51 +87,4 @@ test('nutrition', () => {
   assert.strictEqual(n.bmi, 24.7);
   assert.strictEqual(n.proteinLow, 128);
   assert.ok(n.leanGain > n.maintenance);
-});
-
-test('weight actually used overrides the suggestion and is remembered as the last attempt', () => {
-  const s = P.setWeight(fresh(), 'bench', 80);
-  const r = P.completeSession(Object.assign({}, s, { sessionCount: 1 }), { bench: { weight: 85, reps: [10, 10, 10, 10] } }, '2026-10-15');
-  const lift = r.state.lifts.bench;
-  assert.strictEqual(lift.weight, 87.5);
-  assert.deepStrictEqual(lift.last, { date: '2026-10-15', weight: 85, results: [10, 10, 10, 10], unit: 'reps', change: 'up', message: '+2.5 kg → 87.5 kg' });
-});
-
-test('targets carry rest and effort guidance', () => {
-  const t = P.nextSession(fresh()).exercises;
-  assert.strictEqual(t[0].rest, '2–3 min');
-  assert.match(t.find((e) => e.id === 'leg_press_shallow').effort, /never grind/);
-});
-
-test('a logged estimate is kept when body mass changes', () => {
-  let s = fresh();
-  s = P.completeSession(s, { hip_thrust: { reps: [10, 10, 10, 10] } }).state;
-  s.profile.bodyMass = 100;
-  s = P.syncLifts(s);
-  assert.strictEqual(s.lifts.hip_thrust.weight, 75);
-});
-
-test('yoga days are an hour with no lifts, and appear in the upcoming strip', () => {
-  const s = Object.assign(fresh(), { sessionCount: 2 });
-  const sess = P.nextSession(s);
-  assert.strictEqual(sess.id, 'yoga_a');
-  assert.strictEqual(sess.minutes, 60);
-  assert.strictEqual(sess.exercises.length, 0);
-  const r = P.completeSession(s, {});
-  assert.strictEqual(r.state.sessionCount, 3);
-  assert.strictEqual(r.state.history[0].name, 'Yoga: hips & legs');
-  assert.strictEqual(sess.flow.reduce((t, p) => t + p.min, 0), 60);
-  const b = P.nextSession(Object.assign(fresh(), { sessionCount: 5 }));
-  assert.strictEqual(b.id, 'yoga_b');
-  assert.strictEqual(b.flow.reduce((t, p) => t + p.min, 0), 60);
-  assert.deepStrictEqual(P.upcoming(fresh(), 6).map((d) => d.short), ['Legs A', 'Upper A', 'Yoga A', 'Legs B', 'Upper B', 'Yoga B']);
-});
-
-test('every exercise and pose has a YouTube help link', () => {
-  for (const id of Object.keys(P.EXERCISES)) {
-    const url = P.exerciseHelp(id);
-    assert.match(url, /^https:\/\/www\.youtube\.com\/results\?search_query=/);
-    assert.ok(!decodeURIComponent(url).includes('('), id);
-  }
-  assert.match(P.poseHelp('Tree pose'), /Tree%20pose/);
 });

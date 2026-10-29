@@ -1,38 +1,18 @@
 # Gym
 
-An auto-updating workout plan focused on leg hypertrophy with knee-safe ranges, plus well-rounded upper-body work. It runs entirely in the browser with no build step and no server.
+A simple workout tracker: days in a fixed order, any exercises you like, and the weight × reps for every set. It runs entirely in the browser with no build step and no server.
 
 ## Use it
 
 Open `index.html` in a browser, or use the published copy at https://claude.ai/artifact/CTTfEFqGU4uVQSY3YKejSs (saves to your claude.ai account, so it works across devices).
 
-- **Today** shows the next session. Each exercise card gives the weight to try, sets × rep range, rest time and how close to failure to go, plus what you did last time. Log the weight you actually used and the reps for each set, then press **Finish workout**.
-- **All lifts** lists the next weight and last attempt for every exercise. Type your real working weights here to replace the body-mass estimates (shown in italics).
-- **Me** holds body mass and height (plus optional age and sex for a calorie estimate), weekly sets per muscle, the knee rules and your history.
+- **Today** is the next day in the rotation. It starts with the exercises you did last time on that day. Add more from **Previous exercises** or type a new one. Each exercise has kg and reps boxes per set (greyed hints show last time), **+ Set**, a 2:00 rest timer that starts when you enter reps, and a YouTube **Help** search. **Finish workout** saves the session and moves to the next day.
+- **Lifts** lists every exercise with its last session and heaviest set.
+- **Me** holds body mass and height (BMI, protein, optional calorie estimate), the day order (one per line), history, backup and erase.
 
-## How the plan updates
+Days have no weekdays: train when you like and the app always shows the next one in line. Tapping Finish twice with nothing logged skips a day.
 
-- **Rotation:** Lower A → Upper A → Lower B → Upper B, repeating. Train as many days a week as suits you; the next session is always the next in line, so legs get half of all sessions.
-- **Double progression:** hit the top of the rep range on every set and the weight goes up by that exercise's increment next time. In range holds the weight. Falling below the range twice in a row resets the weight down 10%.
-- **Unloaded work** (bands, holds, balance) progresses by adding reps or seconds instead.
-- **Deloads:** sessions 21–24 of every 24 halve the sets with no progression.
-- **Body mass changes** re-estimate only the weights you haven't entered or earned.
-
-## Knee rules
-
-Built around patellar instability from shallow trochlear grooves:
-
-- No deep squats, lunges, jumps or pivoting. Loaded knee bend stays at or under about 60°.
-- Quads: shallow-range leg press, low-box step-ups, Spanish squat isometrics.
-- VMO and stability every lower day: cable terminal knee extensions, cable hip abduction and adduction, Copenhagen planks, single-leg balance.
-- Cable work: pull-throughs, glute kickbacks, hip abduction/adduction and TKEs, all with the knee held at a fixed angle.
-- Most leg size comes from glutes, hamstrings, adductors and calves, loaded hard with the knee still.
-
-This is general training guidance; a physio's advice for your knee takes priority.
-
-## Customise
-
-Exercises, sets, rep ranges, increments and the rotation live at the top of `plan.js`.
+Data from the earlier fixed plan (v1) is carried over automatically: its logged sets become history and its exercise names appear under Previous exercises.
 
 ## Install on a phone
 

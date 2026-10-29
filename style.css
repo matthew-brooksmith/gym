@@ -1,5 +1,4 @@
-/* Layout: one narrow column built for a phone held between sets; the target
-   weight on each card is the loudest thing on screen. */
+/* Layout: one narrow column built for a phone held between sets. */
 :root {
   --bg: #eef0f2;
   --surface: #ffffff;
@@ -58,38 +57,30 @@ nav.tabs button {
 nav.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 
 .head { display: grid; gap: 6px; }
-.pill { justify-self: start; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--hold); color: var(--hold); }
-.saved { font-size: 13px; color: var(--muted); }
 
 /* Exercise card */
 .ex { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
 .ex header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.chip { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; }
-.target { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
-.try { display: grid; justify-items: start; padding-right: 14px; border-right: 1px solid var(--line); }
-.try .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
-.try .kg { font: 700 44px/1 var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
-.try .kg.text { font-size: 24px; line-height: 1.1; }
-.try .unit { font-size: 13px; color: var(--muted); }
-.spec { margin: 0; display: grid; gap: 4px; min-width: 0; }
-.spec div { display: grid; grid-template-columns: 92px 1fr; gap: 8px; font-size: 14px; }
-.spec dt { color: var(--muted); }
-.spec dd { margin: 0; font-weight: 600; }
 .last { margin: 0; font-size: 14px; padding: 8px 10px; background: var(--field); border-radius: 8px; }
 .last b { font-variant-numeric: tabular-nums; }
-.knee summary { font-size: 14px; color: var(--muted); cursor: pointer; }
-.knee p { margin: 6px 0 0; font-size: 14px; }
 
-.log { display: grid; gap: 8px; }
-.log-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 .field { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
 input, select {
   font: 600 18px var(--body); font-variant-numeric: tabular-nums; color: var(--ink);
   background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%;
 }
-.log input { width: 64px; text-align: center; }
-.log .weight input { width: 92px; }
-input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+textarea { font: 600 16px var(--body); color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; resize: vertical; margin-bottom: 8px; }
+
+/* Set rows: number, kg, reps */
+.sets { display: grid; gap: 6px; }
+.setrow { display: grid; grid-template-columns: 22px 1fr 1fr; gap: 8px; align-items: end; }
+.setno { font: 700 18px var(--display); color: var(--muted); padding-bottom: 9px; text-align: center; }
+.setrow input { text-align: center; }
+.x { font: 600 18px var(--body); line-height: 1; min-width: 36px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.x.armed { font-size: 13px; color: var(--down); border-color: var(--down); }
+.addrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.chipbtn { text-decoration: none; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 button.primary, button.secondary {
   font: 600 18px var(--display); letter-spacing: 0.04em; text-transform: uppercase;
@@ -99,7 +90,6 @@ button.primary { background: var(--accent); color: var(--accent-ink); border: 1p
 button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
 button.danger { color: var(--down); border-color: var(--down); }
 
-.up { color: var(--up); } .down { color: var(--down); } .hold, .incomplete { color: var(--hold); }
 
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
 .panel ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
@@ -108,54 +98,29 @@ button.danger { color: var(--down); border-color: var(--down); }
 .done-list li:first-child { border-top: 0; padding-top: 0; }
 .done-list .n { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 
-/* All lifts table */
+/* Lifts table */
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th.n, td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 th, td { text-align: left; padding: 8px 6px; border-top: 1px solid var(--line); vertical-align: top; }
 th { border-top: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
-td input { width: 84px; font-size: 16px; padding: 6px 8px; }
-td input.estimate { color: var(--muted); font-style: italic; }
-tr.group td { font: 600 15px var(--display); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding-top: 14px; }
 
 .stats { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; }
 .stats div { display: grid; gap: 2px; }
 .stats dt { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
 .stats dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-.bar { display: grid; grid-template-columns: 110px 1fr 28px; gap: 8px; align-items: center; font-size: 14px; }
-.bar .track { height: 10px; background: var(--field); border-radius: 3px; overflow: hidden; }
-.bar .fill { display: block; height: 100%; background: var(--accent); }
-.bar .num { text-align: right; font-variant-numeric: tabular-nums; }
 details.hist summary { cursor: pointer; font-size: 15px; }
 details.hist ul { font-size: 14px; margin-top: 6px; }
 
-@media (max-width: 400px) {
-  .try .kg { font-size: 38px; }
-  .spec div { grid-template-columns: 64px 1fr; }
-}
-.lastmini { display: none; }
 
 /* Upcoming sessions */
 .strip { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .strip li { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); background: var(--surface); }
-.strip li.legs { border-color: var(--accent); color: var(--accent); }
-.strip li.yoga { border-color: var(--up); color: var(--up); }
 .strip li.now { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 
-/* Yoga flow */
-.flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.flow li { border-top: 1px solid var(--line); padding: 6px 0; }
-.flow li:first-child { border-top: 0; }
-.flow li.now { background: var(--field); border-radius: 8px; padding-inline: 8px; }
-.pose { all: unset; display: flex; justify-content: space-between; gap: 8px; width: 100%; cursor: pointer; font-weight: 600; }
-.pose:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.pose-min { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--up); }
-.pose-cue { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
-.t-next { font-size: 12px; opacity: 0.8; margin-top: 2px; }
 
 /* Timers */
-.chipbtn { text-decoration: none; }
-.help { color: var(--accent); font-weight: 600; white-space: nowrap; text-decoration: none; }
 .timer-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .chipbtn { font: 600 14px var(--body); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }
 .timer {
@@ -188,22 +153,12 @@ body:has(.timer:not([hidden])) .wrap { padding-bottom: 110px; }
   nav.tabs { padding-block: 6px; }
   nav.tabs button { font-size: 14px; padding: 9px 0; }
   .ex, .panel { padding: 10px; gap: 8px; border-radius: 10px; }
-  .target { grid-template-columns: 1fr; gap: 6px; }
-  .try { grid-template-columns: auto auto 1fr; align-items: baseline; gap: 8px; padding-right: 0; border-right: 0; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-  .try .kg { font-size: 36px; }
-  .try .unit { align-self: baseline; }
-  .spec div { grid-template-columns: 58px 1fr; font-size: 13px; }
-  .last, .knee p { font-size: 13px; }
-  .log-row { gap: 6px; }
-  .log input { width: 48px; padding: 7px 4px; font-size: 16px; }
-  .log .weight input { width: 70px; }
+  .last { font-size: 13px; }
+  .setrow { gap: 6px; grid-template-columns: 18px 1fr 1fr; }
+  .setrow input { padding: 7px 4px; font-size: 16px; }
   .field { font-size: 11px; }
   button.primary, button.secondary { font-size: 16px; padding: 12px; }
-  .lastcol { display: none; }
-  .lastmini { display: block; color: var(--muted); margin-top: 2px; }
-  td input { width: 64px; }
   th, td { padding: 6px 4px; }
-  .bar { grid-template-columns: 84px 1fr 24px; font-size: 13px; }
   .grid2 { grid-template-columns: 1fr 1fr; gap: 8px; }
   .timer { padding-left: 10px; padding-right: 10px; gap: 6px; }
   .t-clock { font-size: 30px; }
