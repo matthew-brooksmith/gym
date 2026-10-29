@@ -6,7 +6,7 @@ plugins {
 def webOut = layout.buildDirectory.dir('generated/web')
 tasks.register('copyWeb', Copy) {
     from(rootProject.file('..')) {
-        include 'index.html', 'style.css', 'plan.js', 'app.js', 'icons/**'
+        include 'index.html', 'style.css', 'fonts.css', 'fonts/**', 'plan.js', 'app.js', 'icons/**'
     }
     into webOut.map { it.dir('www') }
 }

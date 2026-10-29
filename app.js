@@ -168,7 +168,7 @@
     const inApk = /; wv\)/.test(navigator.userAgent);
     const backup = cloud || inApk ? '' : `<section class="panel"><h2>Backup</h2>
         <div class="grid2"><button type="button" class="secondary" id="export">Export</button>
-        <label class="secondary" style="text-align:center;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;cursor:pointer;font:600 18px var(--display);text-transform:uppercase;letter-spacing:.04em">Import<input type="file" id="import" accept="application/json" hidden></label></div></section>`;
+        <label class="filebtn">Import<input type="file" id="import" accept="application/json" hidden></label></div></section>`;
 
     return `<section class="head"><h1>Me</h1></section>
       <section class="panel">
