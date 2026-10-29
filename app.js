@@ -3,11 +3,10 @@
   const P = window.GymPlan;
   const KEY = 'gym-plan-v1';
   const TAB_KEY = 'gym-plan-tab';
+  const REST_SEC = 120;
 
   // ---------- storage: browser always, plus the account store when this runs as a published artifact ----------
-  function revive(raw) {
-    return P.syncLifts(Object.assign(P.defaultState(), raw));
-  }
+  const revive = (raw) => P.migrate(raw);
   function loadLocal() {
     try {
       const raw = localStorage.getItem(KEY);
@@ -19,11 +18,10 @@
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
   }
 
-  let state = loadLocal() || P.syncLifts(P.defaultState());
+  let state = loadLocal() || P.defaultState();
   let cloud = null;          // db doc ref once connected
   let cloudTimer = null;
   let cloudWrite = Promise.resolve();
-  let saveStatus = 'Saved on this device';
 
   function save() {
     saveLocal();
@@ -31,9 +29,7 @@
     clearTimeout(cloudTimer);
     cloudTimer = setTimeout(() => {
       const json = JSON.stringify(state);
-      cloudWrite = cloudWrite.then(() => cloud.set({ json, updatedAt: new Date().toISOString() }))
-        .then(() => setStatus('Saved to your account'))
-        .catch(() => setStatus('Saved on this device only (account save failed)'));
+      cloudWrite = cloudWrite.then(() => cloud.set({ json, updatedAt: new Date().toISOString() })).catch(() => { /* kept locally */ });
     }, 600);
   }
 
@@ -53,24 +49,14 @@
         await ref.set({ json: JSON.stringify(state), updatedAt: new Date().toISOString() });
       }
       cloud = ref;
-      setStatus('Saved to your account');
       render();
-    } catch (e) {
-      setStatus('Saved on this device only');
-    }
-  }
-
-  function setStatus(text) {
-    saveStatus = text;
-    const el = document.getElementById('save-status');
-    if (el) el.textContent = text;
+    } catch (e) { /* stay local */ }
   }
 
   // ---------- helpers ----------
   const $ = (sel) => document.querySelector(sel);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fmt = (n) => (Math.round(n * 100) / 100).toString();
-  const unitShort = (u) => (u === 'sec' ? 's' : '');
   const dateLabel = (iso) => {
     const d = new Date(iso + 'T12:00:00');
     return isNaN(d) ? iso : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -79,131 +65,92 @@
     const s = Math.max(0, Math.round(sec));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   };
-  const GROUP_ORDER = ['glutes', 'quads', 'hamstrings', 'adductors', 'calves', 'knee stability', 'chest', 'back', 'shoulders', 'arms', 'core'];
+  const setText = (s) => (s.kg != null ? `${fmt(s.kg)}×${s.reps}` : `${s.reps}`);
+  const setsText = (sets) => sets.map(setText).join(', ');
 
   let tab = 'today';
   try { tab = localStorage.getItem(TAB_KEY) || 'today'; } catch (e) { /* ignore */ }
-  let lastOutcomes = null;
+  if (!['today', 'lifts', 'me'].includes(tab)) tab = 'today';
   let armed = null;          // id of a button waiting for its confirming second tap
+  let justSaved = null;      // the session just finished, shown once
 
-  // ---------- Today ----------
-  function lastLine(ex, lift) {
-    const last = lift.last;
-    if (last) {
-      const sets = last.results.join(' · ') + unitShort(last.unit);
-      const load = last.weight ? `${fmt(last.weight)} kg × ` : '';
-      return `<p class="last">Last time, ${esc(dateLabel(last.date))}: <b>${load}${esc(sets)}</b> <span class="${esc(last.change)}">· ${esc(last.message)}</span></p>`;
-    }
-    return '';
+  function draft() {
+    state.draft = P.draftFor(state);
+    return state.draft;
   }
 
-  function exerciseCard(ex, lift, draft) {
-    const d = draft[ex.id] || {};
-    const reps = d.reps || [];
-    const big = ex.loaded
-      ? `<span class="kg">${fmt(ex.weight)}</span><span class="unit">kg${ex.perHand ? ' each hand' : ''}</span>`
-      : `<span class="kg text">${ex.unit === 'sec' ? 'Hold' : 'Band'}</span><span class="unit">${ex.unit === 'sec' ? 'bodyweight' : 'or light cable'}</span>`;
-    const setInputs = Array.from({ length: ex.sets }, (_, i) =>
-      `<label class="field">Set ${i + 1}<input type="number" min="0" inputmode="numeric" id="r-${ex.id}-${i}" data-ex="${ex.id}" data-set="${i}" value="${esc(reps[i] ?? '')}" placeholder="${ex.max}"></label>`
-    ).join('');
-    const weightInput = ex.loaded
-      ? `<label class="field weight">Weight used (kg)<input type="number" min="0" step="0.5" inputmode="decimal" id="w-${ex.id}" data-ex="${ex.id}" data-weight="1" value="${esc(d.weight ?? fmt(ex.weight))}"></label>`
-      : '';
+  // ---------- Today ----------
+  function exerciseCard(e, i) {
+    const last = P.lastFor(state, e.name);
+    const rows = e.sets.map((s, j) => {
+      const prev = last && (last.sets[j] || last.sets[last.sets.length - 1]);
+      return `<div class="setrow"><span class="setno">${j + 1}</span>
+        <label class="field">${j ? '' : 'kg'}<input aria-label="Set ${j + 1} kg" type="number" min="0" step="0.5" inputmode="decimal" data-e="${i}" data-s="${j}" data-f="kg" value="${esc(s.kg ?? '')}" placeholder="${prev && prev.kg != null ? fmt(prev.kg) : ''}"></label>
+        <label class="field">${j ? '' : 'Reps'}<input aria-label="Set ${j + 1} reps" type="number" min="0" inputmode="numeric" data-e="${i}" data-s="${j}" data-f="reps" value="${esc(s.reps ?? '')}" placeholder="${prev ? esc(prev.reps ?? '') : ''}"></label></div>`;
+    }).join('');
+    const rm = armed === `rm-${i}`;
     return `<article class="ex">
-      <header><h3>${esc(ex.name)}</h3><span class="chip">${esc(ex.group)}</span></header>
-      <div class="target">
-        <div class="try"><span class="label">Try</span>${big}</div>
-        <dl class="spec">
-          <div><dt>Sets</dt><dd>${ex.sets} × ${ex.min}–${ex.max}${unitShort(ex.unit)}</dd></div>
-          <div><dt>Rest</dt><dd>${esc(ex.rest)}</dd></div>
-          <div><dt>Effort</dt><dd>${esc(ex.effort)}</dd></div>
-        </dl>
+      <header><h3>${esc(e.name)}</h3><button type="button" class="x${rm ? ' armed' : ''}" data-remove="${i}" aria-label="Remove ${esc(e.name)}">${rm ? 'Remove?' : '×'}</button></header>
+      ${last ? `<p class="last">Last, ${esc(dateLabel(last.date))}: <b>${esc(setsText(last.sets))}</b></p>` : ''}
+      <div class="sets">${rows}</div>
+      <div class="timer-btns">
+        <button type="button" class="chipbtn" data-addset="${i}">+ Set</button>
+        <button type="button" class="chipbtn" data-rest="${REST_SEC}">Rest ${fmtClock(REST_SEC)}</button>
+        <a class="chipbtn" href="${esc(P.helpUrl(e.name))}" target="_blank" rel="noopener">Help ▶</a>
       </div>
-      ${lastLine(ex, lift)}
-      ${ex.kneeNote ? `<details class="knee"><summary>Notes</summary><p>${esc(ex.kneeNote)}</p></details>` : ''}
-      <div class="log"><div class="log-row">${weightInput}${setInputs}</div>
-        <div class="timer-btns">
-          ${ex.unit === 'sec' ? `<button type="button" class="chipbtn" data-hold="${ex.id}" data-min="${ex.min}" data-max="${ex.max}">Start hold</button>` : ''}
-          <button type="button" class="chipbtn" data-rest="${ex.restSec}" data-name="${esc(ex.name)}">Rest ${fmtClock(ex.restSec)}</button>
-          <a class="chipbtn" href="${esc(ex.help)}" target="_blank" rel="noopener">Help ▶</a>
-        </div></div>
     </article>`;
   }
 
-  function outcomesPanel() {
-    if (!lastOutcomes || !lastOutcomes.length) return '';
-    const rows = lastOutcomes.map((o) => {
-      const next = o.weight != null ? `${fmt(o.next)} kg` : '';
-      return `<li><span>${esc(o.name)}</span><span class="n ${esc(o.change)}">${esc(next || o.message)}</span></li>`;
-    }).join('');
-    return `<section class="panel flash"><h2>Workout saved. Next time:</h2><ul class="done-list">${rows}</ul></section>`;
+  function addPanel(d) {
+    const used = d.entries.map((e) => e.name.toLowerCase());
+    const names = P.exerciseNames(state).filter((n) => !used.includes(n.toLowerCase())).sort((a, b) => a.localeCompare(b));
+    const pick = names.length
+      ? `<select id="pick" aria-label="Previous exercises"><option value="">Previous exercises…</option>${names.map((n) => `<option>${esc(n)}</option>`).join('')}</select>`
+      : '';
+    return `<section class="panel add">
+      ${pick}
+      <form id="new-ex" class="addrow"><input id="new-name" type="text" placeholder="New exercise" autocomplete="off" aria-label="New exercise"><button type="submit" class="chipbtn">Add</button></form>
+    </section>`;
+  }
+
+  function savedPanel() {
+    if (!justSaved) return '';
+    return `<section class="panel flash"><h2>Saved: ${esc(justSaved.day)}</h2><ul class="done-list">${justSaved.entries.map((e) =>
+      `<li><span>${esc(e.name)}</span><span class="n">${esc(setsText(e.sets))}</span></li>`).join('')}</ul></section>`;
   }
 
   function scheduleStrip() {
-    return `<ol class="strip">${P.upcoming(state, 6).map((d, i) =>
-      `<li class="${d.id.startsWith('yoga') ? 'yoga' : d.id.startsWith('lower') ? 'legs' : 'upper'}${i === 0 ? ' now' : ''}">${esc(d.short)}</li>`).join('')}</ol>`;
-  }
-
-  function renderYoga(s) {
-    const cur = timer && timer.kind === 'flow' ? timer.step : -1;
-    const rows = s.flow.map((p, i) => `<li class="${i === cur ? 'now' : ''}">
-        <button type="button" class="pose" data-pose="${i}"><span class="pose-name">${esc(p.name)}${p.sides ? ' <span class="muted small">each side</span>' : ''}</span><span class="pose-min">${p.min} min</span></button>
-        <p class="pose-cue">${esc(p.cue)} <a class="help" href="${esc(P.poseHelp(p.name))}" target="_blank" rel="noopener">Help ▶</a></p></li>`).join('');
-    return `${scheduleStrip()}
-      <section class="head">
-        <span class="eyebrow">Session ${s.index + 1} · ${s.minutes} min</span>
-        <h1>${esc(s.name)}</h1>
-      </section>
-      <article class="ex">
-        <ol class="flow">${rows}</ol>
-        <details class="knee"><summary>Notes</summary><p>${esc(s.note)}</p></details>
-        <div class="timer-btns"><button type="button" class="chipbtn" data-flow="0">Start guided flow</button></div>
-      </article>
-      <button type="button" class="primary" id="finish">Done</button>`;
+    return `<ol class="strip">${P.upcoming(state, Math.min(6, Math.max(state.days.length, 4))).map((d, i) =>
+      `<li class="${i === 0 ? 'now' : ''}">${esc(d)}</li>`).join('')}</ol>`;
   }
 
   function renderToday() {
-    const s = P.nextSession(state);
-    if (s.minutes) return outcomesPanel() + renderYoga(s);
-    const draft = state.draft && state.draft.index === s.index ? state.draft.log : {};
-    const kind = s.id.startsWith('lower') ? 'Leg day' : 'Upper day';
-    return `${outcomesPanel()}
+    const d = draft();
+    const n = state.history.length + 1;
+    return `${savedPanel()}
       ${scheduleStrip()}
       <section class="head">
-        <span class="eyebrow">Session ${s.index + 1} · ${kind}</span>
-        <h1>${esc(s.name)}</h1>
-        ${s.deload ? '<span class="pill">Deload week: half the sets, same weights, nothing moves up</span>' : ''}
+        <span class="eyebrow">Session ${n}</span>
+        <h1>${esc(d.day)}</h1>
       </section>
-      ${s.exercises.map((ex) => exerciseCard(ex, state.lifts[ex.id], draft)).join('')}
-      <button type="button" class="primary" id="finish">${armed === 'finish' ? 'Nothing logged. Tap again to skip this session' : 'Finish workout'}</button>`;
+      ${d.entries.map(exerciseCard).join('')}
+      ${addPanel(d)}
+      <button type="button" class="primary" id="finish">${armed === 'finish' ? 'Nothing logged. Tap again to skip' : 'Finish workout'}</button>`;
   }
 
-  // ---------- All lifts ----------
+  // ---------- Lifts ----------
   function renderLifts() {
-    const ids = [];
-    for (const day of P.ROTATION) for (const id of day.exercises) if (!ids.includes(id)) ids.push(id);
-    const byGroup = {};
-    for (const id of ids) (byGroup[P.EXERCISES[id].group] = byGroup[P.EXERCISES[id].group] || []).push(id);
-    const rows = GROUP_ORDER.filter((g) => byGroup[g]).map((g) => {
-      const head = `<tr class="group"><td colspan="3">${esc(g)}</td></tr>`;
-      return head + byGroup[g].map((id) => {
-        const ex = P.EXERCISES[id];
-        const lift = state.lifts[id];
-        const bonus = lift.bonus || 0;
-        const target = `${ex.sets} × ${ex.min + bonus}–${ex.max + bonus}${unitShort(ex.unit)}`;
-        const next = ex.increment
-          ? `<input type="number" step="0.5" min="0" inputmode="decimal" id="l-${id}" data-lift="${id}" value="${fmt(lift.weight)}" class="${lift.source === 'estimate' ? 'estimate' : ''}" aria-label="${esc(ex.name)} next weight">${ex.perHand ? ' <span class="muted small">/hand</span>' : ''}`
-          : '<span class="muted">—</span>';
-        const last = lift.last
-          ? `${lift.last.weight ? fmt(lift.last.weight) + ' kg × ' : ''}${lift.last.results.join(', ')}${unitShort(lift.last.unit)} <span class="muted small">${esc(dateLabel(lift.last.date))}</span>`
-          : '<span class="muted">Not yet</span>';
-        return `<tr><td>${esc(ex.name)}<br><span class="muted small">${target}</span><div class="lastmini small">Last: ${last}</div></td><td>${next}</td><td class="lastcol">${last}</td></tr>`;
-      }).join('');
+    const names = P.exerciseNames(state).sort((a, b) => a.localeCompare(b));
+    const rows = names.map((n) => {
+      const last = P.lastFor(state, n);
+      const best = P.bestFor(state, n);
+      return `<tr><td>${esc(n)}<div class="muted small">${esc(dateLabel(last.date))} · ${esc(setsText(last.sets))}</div></td>
+        <td class="n">${best ? `${fmt(best.kg)} kg<div class="muted small">×${esc(best.reps)}</div>` : '<span class="muted">—</span>'}</td></tr>`;
     }).join('');
-    return `<section class="head"><span class="eyebrow">Next weight for every exercise</span><h1>All lifts</h1></section>
-      <section class="panel"><div class="table-wrap"><table>
-        <thead><tr><th>Exercise</th><th>Next (kg)</th><th class="lastcol">Last attempt</th></tr></thead>
-        <tbody>${rows}</tbody></table></div></section>`;
+    return `<section class="head"><h1>Lifts</h1></section>
+      ${names.length ? `<section class="panel"><div class="table-wrap"><table>
+        <thead><tr><th>Exercise · last</th><th class="n">Best</th></tr></thead>
+        <tbody>${rows}</tbody></table></div></section>` : ''}`;
   }
 
   // ---------- Me ----------
@@ -216,22 +163,14 @@
       if (n.maintenance) stats.push(['Maintenance', `${n.maintenance} kcal`], ['Lean gain', `${n.leanGain} kcal`]);
       food = `<dl class="stats">${stats.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
     }
-    const vol = P.weeklyVolume();
-    const max = Math.max(...Object.values(vol));
-    const bars = GROUP_ORDER.filter((g) => vol[g]).map((g) =>
-      `<div class="bar"><span>${esc(g)}</span><span class="track"><span class="fill" style="width:${(vol[g] / max) * 100}%"></span></span><span class="num">${vol[g]}</span></div>`).join('');
-    const hist = state.history.length
-      ? state.history.slice(0, 15).map((h) => `<details class="hist"><summary>${esc(dateLabel(h.date))} · ${esc(h.name)}${h.deload ? ' (deload)' : ''}</summary><ul>` +
-          h.outcomes.map((o) => `<li>${esc(o.name)}: ${o.weight ? fmt(o.weight) + ' kg × ' : ''}${esc(o.results.join(', ') || 'not logged')} <span class="${esc(o.change)}">→ ${esc(o.message)}</span></li>`).join('') +
-          '</ul></details>').join('')
-      : '';
+    const hist = state.history.slice(0, 20).map((h) => `<details class="hist"><summary>${esc(dateLabel(h.date))} · ${esc(h.day)}</summary><ul>` +
+      h.entries.map((e) => `<li>${esc(e.name)}: ${esc(setsText(e.sets))}</li>`).join('') + '</ul></details>').join('');
     const inApk = /; wv\)/.test(navigator.userAgent);
     const backup = cloud || inApk ? '' : `<section class="panel"><h2>Backup</h2>
-        <p class="muted small">Your data is saved in this browser only. Export it to move it to another device.</p>
         <div class="grid2"><button type="button" class="secondary" id="export">Export</button>
         <label class="secondary" style="text-align:center;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;cursor:pointer;font:600 18px var(--display);text-transform:uppercase;letter-spacing:.04em">Import<input type="file" id="import" accept="application/json" hidden></label></div></section>`;
 
-    return `<section class="head"><span class="eyebrow">Body stats</span><h1>Me</h1></section>
+    return `<section class="head"><h1>Me</h1></section>
       <section class="panel">
         <form id="profile" class="grid2">
           <label class="field">Body mass (kg)<input id="p-mass" name="bodyMass" type="number" step="0.1" min="30" inputmode="decimal" value="${esc(p.bodyMass ?? '')}" required></label>
@@ -245,10 +184,13 @@
         </form>
         ${food}
       </section>
-      <section class="panel"><h2>Sets per muscle</h2>${bars}</section>
+      <section class="panel"><h2>Days, in order</h2>
+        <form id="days"><textarea id="days-list" rows="${Math.max(4, state.days.length)}" aria-label="Days, one per line">${esc(state.days.join('\n'))}</textarea>
+        <button type="submit" class="secondary">Save days</button></form>
+      </section>
       ${hist ? `<section class="panel"><h2>History</h2>${hist}</section>` : ''}
       ${backup}
-      <button type="button" class="secondary danger" id="reset">${armed === 'reset' ? 'Tap again to erase everything' : 'Erase all weights and history'}</button>`;
+      <button type="button" class="secondary danger" id="reset">${armed === 'reset' ? 'Tap again to erase everything' : 'Erase all history'}</button>`;
   }
 
   // ---------- render + events ----------
@@ -257,22 +199,12 @@
     $('#view').innerHTML = tab === 'lifts' ? renderLifts() : tab === 'me' ? renderMe() : renderToday();
   }
 
-  function readDraft() {
-    const log = {};
-    document.querySelectorAll('#view input[data-ex]').forEach((el) => {
-      const id = el.dataset.ex;
-      log[id] = log[id] || { reps: [] };
-      if (el.dataset.weight) log[id].weight = el.value === '' ? null : Number(el.value);
-      else log[id].reps[Number(el.dataset.set)] = el.value === '' ? null : Number(el.value);
-    });
-    return log;
-  }
-
   document.querySelector('nav.tabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-tab]');
     if (!b) return;
     tab = b.dataset.tab;
     armed = null;
+    justSaved = null;
     try { localStorage.setItem(TAB_KEY, tab); } catch (err) { /* ignore */ }
     render();
     window.scrollTo(0, 0);
@@ -280,10 +212,9 @@
 
   const view = $('#view');
 
-  // ---------- timers ----------
-  // Rest counts down from the exercise's rest time and starts automatically when
-  // a set is logged. Hold counts up for timed exercises and fills in the set.
-  // Times are kept as timestamps so they stay right if the screen sleeps.
+  // ---------- rest timer ----------
+  // Counts down and starts automatically when reps are entered. Kept as a
+  // timestamp so it stays right if the screen sleeps.
   let timer = null;
   let tick = null;
   let audio = null;
@@ -305,140 +236,95 @@
     } catch (e) { /* no audio */ }
   }
 
-  function startRest(sec, name, label) {
-    timer = { kind: 'rest', name, label: label || 'Rest', end: Date.now() + sec * 1000, alerted: false };
-    runTimer();
-  }
-  function startHold(exId, min, max) {
-    timer = { kind: 'hold', exId, min, max, start: Date.now(), alerted: false };
-    runTimer();
-  }
-  // Guided yoga: steps through each pose, beeping at the switch-sides point and between poses.
-  function startFlow(step) {
-    const flow = P.nextSession(state).flow;
-    if (!flow || !flow[step]) { stopTimer(); return; }
-    const p = flow[step];
-    const len = p.min * 60 * 1000;
-    timer = { kind: 'flow', flow, step, start: Date.now(), end: Date.now() + len, half: p.sides ? Date.now() + len / 2 : null, alertedHalf: false };
-    runTimer();
-    markPose();
-  }
-  function markPose() {
-    document.querySelectorAll('.flow li').forEach((li, i) => li.classList.toggle('now', !!timer && timer.kind === 'flow' && i === timer.step));
+  function startRest(sec) {
+    timer = { end: Date.now() + sec * 1000, alerted: false };
+    clearInterval(tick);
+    if (audio && audio.state === 'suspended') audio.resume();
+    drawTimer();
+    tick = setInterval(drawTimer, 250);
   }
   function stopTimer() {
     timer = null;
     clearInterval(tick);
     $('#timer').hidden = true;
   }
-  function runTimer() {
-    clearInterval(tick);
-    if (audio && audio.state === 'suspended') audio.resume();
-    drawTimer();
-    tick = setInterval(drawTimer, 250);
-  }
   function drawTimer() {
     if (!timer) return;
     const el = $('#timer');
     el.hidden = false;
-    if (timer.kind === 'flow') {
-      const now = Date.now();
-      if (timer.half && !timer.alertedHalf && now >= timer.half) { timer.alertedHalf = true; alertDone(); }
-      if (now >= timer.end) {
-        alertDone();
-        if (timer.step + 1 < timer.flow.length) { startFlow(timer.step + 1); return; }
-        timer = { kind: 'rest', label: 'Yoga', end: now, alerted: true };
-      } else {
-        const p = timer.flow[timer.step];
-        const next = timer.flow[timer.step + 1];
-        const side = timer.half ? (now < timer.half ? 'Side 1 · ' : 'Side 2 · ') : '';
-        el.className = 'timer';
-        el.innerHTML = `<div class="t-main"><span class="t-label">${side}${esc(p.name)}</span><span class="t-clock">${fmtClock(Math.ceil((timer.end - now) / 1000))}</span>${next ? `<span class="t-next">Next: ${esc(next.name)}</span>` : ''}</div>
-          <div class="t-btns"><button type="button" data-t="flow-next">Next</button><button type="button" data-t="stop">Stop</button></div>`;
-        return;
-      }
-    }
-    if (timer.kind === 'rest') {
-      const left = (timer.end - Date.now()) / 1000;
-      const done = left <= 0;
-      if (done && !timer.alerted) { timer.alerted = true; alertDone(); }
-      el.className = done ? 'timer done' : 'timer';
-      el.innerHTML = `<div class="t-main"><span class="t-label">${done ? `${timer.label} over` : timer.label}</span><span class="t-clock">${done ? 'Go' : fmtClock(Math.ceil(left))}</span></div>
-        <div class="t-btns"><button type="button" data-t="minus">−15</button><button type="button" data-t="plus">+15</button><button type="button" data-t="stop">${done ? 'Close' : 'Skip'}</button></div>`;
-    } else {
-      const secs = (Date.now() - timer.start) / 1000;
-      if (secs >= timer.max && !timer.alerted) { timer.alerted = true; alertDone(); }
-      el.className = secs >= timer.min ? 'timer done' : 'timer';
-      el.innerHTML = `<div class="t-main"><span class="t-label">Hold ${timer.min}–${timer.max}s</span><span class="t-clock">${Math.floor(secs)}s</span></div>
-        <div class="t-btns"><button type="button" data-t="hold-done">Done</button><button type="button" data-t="stop">Cancel</button></div>`;
-    }
+    const left = (timer.end - Date.now()) / 1000;
+    const done = left <= 0;
+    if (done && !timer.alerted) { timer.alerted = true; alertDone(); }
+    el.className = done ? 'timer done' : 'timer';
+    el.innerHTML = `<div class="t-main"><span class="t-label">${done ? 'Rest over' : 'Rest'}</span><span class="t-clock">${done ? 'Go' : fmtClock(Math.ceil(left))}</span></div>
+      <div class="t-btns"><button type="button" data-t="minus">−15</button><button type="button" data-t="plus">+15</button><button type="button" data-t="stop">${done ? 'Close' : 'Skip'}</button></div>`;
   }
 
   $('#timer').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-t]');
     if (!b || !timer) return;
     const t = b.dataset.t;
-    if (t === 'stop') { stopTimer(); markPose(); }
-    else if (t === 'flow-next') { if (timer.step + 1 < timer.flow.length) startFlow(timer.step + 1); else { stopTimer(); markPose(); } }
+    if (t === 'stop') stopTimer();
     else if (t === 'minus') { timer.end -= 15000; drawTimer(); }
     else if (t === 'plus') { timer.end = Math.max(timer.end, Date.now()) + 15000; timer.alerted = false; drawTimer(); }
-    else if (t === 'hold-done') {
-      const secs = Math.floor((Date.now() - timer.start) / 1000);
-      const exId = timer.exId;
-      const empty = Array.from(document.querySelectorAll(`#view input[data-ex="${exId}"][data-set]`)).find((i) => i.value === '');
-      if (empty) {
-        empty.value = secs;
-        empty.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-      const restBtn = empty && empty.closest('.ex').querySelector('button[data-rest]');
-      if (restBtn) startRest(Number(restBtn.dataset.rest), restBtn.dataset.name);
-      else stopTimer();
-    }
   });
 
   document.addEventListener('visibilitychange', () => { if (!document.hidden && timer) drawTimer(); });
 
-  view.addEventListener('change', (e) => {
-    const el = e.target;
-    if (!el.dataset.set || el.value === '') return;
-    if (timer && timer.kind === 'hold') return;
-    const restBtn = el.closest('.ex').querySelector('button[data-rest]');
-    if (restBtn) startRest(Number(restBtn.dataset.rest), restBtn.dataset.name);
-  });
-
+  // ---------- Today events ----------
   view.addEventListener('input', (e) => {
-    if (!e.target.dataset.ex) return;
-    state.draft = { index: state.sessionCount, log: readDraft() };
+    const el = e.target;
+    if (el.dataset.e == null) return;
+    const d = draft();
+    d.entries[Number(el.dataset.e)].sets[Number(el.dataset.s)][el.dataset.f] = el.value === '' ? null : Number(el.value);
     if (armed === 'finish') { armed = null; $('#finish').textContent = 'Finish workout'; }
     save();
   });
 
   view.addEventListener('change', (e) => {
-    const id = e.target.dataset.lift;
-    if (!id) return;
-    state = P.setWeight(state, id, e.target.value);
-    save();
-    e.target.classList.remove('estimate');
+    const el = e.target;
+    if (el.dataset.f === 'reps' && el.value !== '') startRest(REST_SEC);
+    if (el.id === 'pick' && el.value) {
+      state.draft = P.addExercise(draft(), state, el.value);
+      save();
+      render();
+    }
   });
+
+  function hasData(entry) {
+    return entry.sets.some((s) => s.kg != null || s.reps != null);
+  }
 
   view.addEventListener('click', (e) => {
     const t = e.target.closest('button');
     if (!t) return;
-    if (t.dataset.flow) { startFlow(Number(t.dataset.flow)); return; }
-    if (t.dataset.pose) { startFlow(Number(t.dataset.pose)); return; }
-    if (t.dataset.countdown) { startRest(Number(t.dataset.countdown), t.dataset.name, t.dataset.name); return; }
-    if (t.dataset.rest) { startRest(Number(t.dataset.rest), t.dataset.name); return; }
-    if (t.dataset.hold) { startHold(t.dataset.hold, Number(t.dataset.min), Number(t.dataset.max)); return; }
-    if (t.id === 'finish') {
-      const log = readDraft();
-      const isYoga = !!P.nextSession(state).minutes;
-      const empty = !isYoga && Object.values(log).every((x) => x.reps.every((v) => v == null));
-      if (empty && armed !== 'finish') { armed = 'finish'; t.textContent = 'Nothing logged. Tap again to skip this session'; return; }
+    if (t.dataset.rest) { startRest(Number(t.dataset.rest)); return; }
+    if (t.dataset.addset) {
+      const entry = draft().entries[Number(t.dataset.addset)];
+      const prev = entry.sets[entry.sets.length - 1];
+      entry.sets.push({ kg: prev ? prev.kg : null, reps: null });
+      save();
+      render();
+      return;
+    }
+    if (t.dataset.remove) {
+      const i = Number(t.dataset.remove);
+      const d = draft();
+      if (hasData(d.entries[i]) && armed !== `rm-${i}`) { armed = `rm-${i}`; render(); return; }
       armed = null;
-      const res = P.completeSession(state, log);
-      state = res.state;
-      delete state.draft;
-      lastOutcomes = res.outcomes;
+      d.entries.splice(i, 1);
+      save();
+      render();
+      return;
+    }
+    if (t.id === 'finish') {
+      const d = draft();
+      const empty = !d.entries.some((x) => x.sets.some((s) => s.reps != null));
+      if (empty && armed !== 'finish') { armed = 'finish'; t.textContent = 'Nothing logged. Tap again to skip'; return; }
+      armed = null;
+      const before = state.history.length;
+      state = P.finishSession(state, d);
+      justSaved = state.history.length > before ? state.history[0] : null;
       stopTimer();
       save();
       render();
@@ -446,33 +332,43 @@
     } else if (t.id === 'reset') {
       if (armed !== 'reset') { armed = 'reset'; render(); return; }
       armed = null;
-      state = P.syncLifts(P.defaultState());
-      lastOutcomes = null;
+      state = Object.assign(P.defaultState(), { profile: state.profile, days: state.days });
+      justSaved = null;
       save();
       render();
     } else if (t.id === 'export') {
       const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `gym-plan-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `gym-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
   });
 
   view.addEventListener('submit', (e) => {
-    if (e.target.id !== 'profile') return;
     e.preventDefault();
-    const f = e.target.elements;
-    state.profile = {
-      bodyMass: Number(f.bodyMass.value),
-      height: Number(f.height.value),
-      age: f.age.value ? Number(f.age.value) : null,
-      sex: f.sex.value,
-    };
-    state = P.syncLifts(state);
-    save();
-    render();
+    const id = e.target.id;
+    if (id === 'new-ex') {
+      const name = $('#new-name').value;
+      state.draft = P.addExercise(draft(), state, name);
+      save();
+      render();
+    } else if (id === 'days') {
+      state = P.setDays(state, $('#days-list').value.split('\n'));
+      save();
+      render();
+    } else if (id === 'profile') {
+      const f = e.target.elements;
+      state.profile = {
+        bodyMass: Number(f.bodyMass.value),
+        height: Number(f.height.value),
+        age: f.age.value ? Number(f.age.value) : null,
+        sex: f.sex.value,
+      };
+      save();
+      render();
+    }
   });
 
   view.addEventListener('change', async (e) => {
@@ -483,9 +379,7 @@
       state = revive(JSON.parse(await file.text()));
       save();
       render();
-    } catch (err) {
-      setStatus('That file is not a Gym Plan backup');
-    }
+    } catch (err) { /* not a backup file */ }
   });
 
   render();

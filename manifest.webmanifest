@@ -1,7 +1,7 @@
 {
   "name": "Gym",
   "short_name": "Gym",
-  "description": "Knee-safe, leg-focused workout plan that tells you what weight to try next.",
+  "description": "Workout tracker: days in order, any exercises, kg and reps per set.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
