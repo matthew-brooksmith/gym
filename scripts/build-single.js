@@ -12,6 +12,8 @@ const keep = head.split('\n').map((l) => l.trim())
   .filter((l) => l.startsWith('<title') || l.includes('viewport-fit-sides') || l.includes('fonts.googleapis.com'));
 const page = [
   ...keep,
+  // The artifact can't serve fonts/, so it loads the same Anton from Google Fonts.
+  '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&display=swap">',
   `<style>\n${read('style.css')}</style>`,
   body
     .replace('<script src="plan.js"></script>', () => `<script>\n${read('plan.js')}</script>`)
