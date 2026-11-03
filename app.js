@@ -74,9 +74,14 @@
   let armed = null;          // id of a button waiting for its confirming second tap
   let justSaved = null;      // the session just finished, shown once
 
+  // A day's draft is only stored once something in it changes, so an untouched
+  // day keeps following its latest template.
   function draft() {
-    state.draft = P.draftFor(state);
-    return state.draft;
+    return P.draftFor(state);
+  }
+  function commit(d) {
+    state.drafts = Object.assign({}, state.drafts, { [d.day]: d });
+    save();
   }
 
   // ---------- Today ----------
@@ -119,16 +124,18 @@
       `<li><span>${esc(e.name)}</span><span class="n">${esc(setsText(e.sets))}</span></li>`).join('')}</ul></section>`;
   }
 
-  function scheduleStrip() {
-    return `<ol class="strip">${P.upcoming(state, Math.min(6, Math.max(state.days.length, 4))).map((d, i) =>
-      `<li class="${i === 0 ? 'now' : ''}">${esc(d)}</li>`).join('')}</ol>`;
+  // Every day, in order; tap one to train it now. The highlighted one is the
+  // day after the last finished workout unless another was picked.
+  function dayPicker() {
+    return `<nav class="strip" aria-label="Pick a day">${state.days.map((d, i) =>
+      `<button type="button" data-day="${i}"${i === state.dayIndex ? ' aria-current="true"' : ''}>${esc(d)}${state.drafts && state.drafts[d] ? '<span class="dot" aria-label="in progress">•</span>' : ''}</button>`).join('')}</nav>`;
   }
 
   function renderToday() {
     const d = draft();
     const n = state.history.length + 1;
     return `${savedPanel()}
-      ${scheduleStrip()}
+      ${dayPicker()}
       <section class="head">
         <span class="eyebrow">Session ${n}</span>
         <h1>${esc(d.day)}</h1>
@@ -278,15 +285,14 @@
     const d = draft();
     d.entries[Number(el.dataset.e)].sets[Number(el.dataset.s)][el.dataset.f] = el.value === '' ? null : Number(el.value);
     if (armed === 'finish') { armed = null; $('#finish').textContent = 'Finish workout'; }
-    save();
+    commit(d);
   });
 
   view.addEventListener('change', (e) => {
     const el = e.target;
     if (el.dataset.f === 'reps' && el.value !== '') startRest(REST_SEC);
     if (el.id === 'pick' && el.value) {
-      state.draft = P.addExercise(draft(), state, el.value);
-      save();
+      commit(P.addExercise(draft(), state, el.value));
       render();
     }
   });
@@ -299,11 +305,20 @@
     const t = e.target.closest('button');
     if (!t) return;
     if (t.dataset.rest) { startRest(Number(t.dataset.rest)); return; }
+    if (t.dataset.day) {
+      state = P.selectDay(state, t.dataset.day);
+      armed = null;
+      justSaved = null;
+      save();
+      render();
+      return;
+    }
     if (t.dataset.addset) {
-      const entry = draft().entries[Number(t.dataset.addset)];
+      const d = draft();
+      const entry = d.entries[Number(t.dataset.addset)];
       const prev = entry.sets[entry.sets.length - 1];
       entry.sets.push({ kg: prev ? prev.kg : null, reps: null });
-      save();
+      commit(d);
       render();
       return;
     }
@@ -313,7 +328,7 @@
       if (hasData(d.entries[i]) && armed !== `rm-${i}`) { armed = `rm-${i}`; render(); return; }
       armed = null;
       d.entries.splice(i, 1);
-      save();
+      commit(d);
       render();
       return;
     }
@@ -351,8 +366,7 @@
     const id = e.target.id;
     if (id === 'new-ex') {
       const name = $('#new-name').value;
-      state.draft = P.addExercise(draft(), state, name);
-      save();
+      commit(P.addExercise(draft(), state, name));
       render();
     } else if (id === 'days') {
       state = P.setDays(state, $('#days-list').value.split('\n'));

@@ -32,6 +32,8 @@
       if (!Array.isArray(s.days) || !s.days.length) s.days = DEFAULT_DAYS.slice();
       s.dayIndex = ((Number(s.dayIndex) || 0) % s.days.length + s.days.length) % s.days.length;
       s.history = Array.isArray(s.history) ? s.history : [];
+      s.drafts = Object.assign({}, s.drafts);
+      if (s.draft) { if (s.draft.day && !s.drafts[s.draft.day]) s.drafts[s.draft.day] = s.draft; delete s.draft; }
       return s;
     }
     const history = [];
@@ -96,11 +98,19 @@
     return state.days[state.dayIndex % state.days.length];
   }
 
-  // The session being logged: the saved draft, or a fresh one from the template.
+  // The session being logged: that day's unfinished draft, or a fresh one from
+  // the template. Drafts are kept per day, so switching days loses nothing.
   function draftFor(state) {
     const day = currentDay(state);
-    if (state.draft && state.draft.day === day && state.draft.dayIndex === state.dayIndex) return state.draft;
-    return { day, dayIndex: state.dayIndex, entries: templateFor(state, day) };
+    const saved = state.drafts && state.drafts[day];
+    return saved || { day, entries: templateFor(state, day) };
+  }
+
+  // Train any day at any time; the order only decides which day is offered next.
+  function selectDay(state, index) {
+    const i = Number(index);
+    if (!(i >= 0 && i < state.days.length)) return state;
+    return Object.assign({}, state, { dayIndex: i });
   }
 
   function addExercise(draft, state, name) {
@@ -122,9 +132,11 @@
     const history = entries.length
       ? [{ date: date || new Date().toISOString().slice(0, 10), day: draft.day, entries }].concat(state.history).slice(0, HISTORY_CAP)
       : state.history;
-    const next = Object.assign({}, state, { history, dayIndex: (state.dayIndex + 1) % state.days.length });
-    delete next.draft;
-    return next;
+    const drafts = Object.assign({}, state.drafts);
+    delete drafts[draft.day];
+    const done = state.days.indexOf(draft.day);
+    const from = done >= 0 ? done : state.dayIndex;
+    return Object.assign({}, state, { history, drafts, dayIndex: (from + 1) % state.days.length });
   }
 
   function setDays(state, names) {
@@ -132,9 +144,9 @@
     if (!days.length) return state;
     const cur = currentDay(state);
     const idx = days.indexOf(cur);
-    const next = Object.assign({}, state, { days, dayIndex: idx >= 0 ? idx : 0 });
-    delete next.draft;
-    return next;
+    const drafts = {};
+    for (const d of days) if (state.drafts && state.drafts[d]) drafts[d] = state.drafts[d];
+    return Object.assign({}, state, { days, drafts, dayIndex: idx >= 0 ? idx : 0 });
   }
 
   function helpUrl(name) {
@@ -161,7 +173,7 @@
     return out;
   }
 
-  const api = { DEFAULT_DAYS, defaultState, migrate, exerciseNames, lastFor, bestFor, templateFor, currentDay, draftFor, addExercise, upcoming, finishSession, setDays, helpUrl, nutrition };
+  const api = { DEFAULT_DAYS, defaultState, migrate, exerciseNames, lastFor, bestFor, templateFor, currentDay, draftFor, selectDay, addExercise, upcoming, finishSession, setDays, helpUrl, nutrition };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GymPlan = api;
 })(typeof window !== 'undefined' ? window : globalThis);
