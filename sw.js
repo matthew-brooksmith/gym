@@ -1,6 +1,6 @@
 // Offline support for the installed app. App files are served from cache and
 // refreshed in the background, so a new version shows up on the next launch.
-const CACHE = 'gym-v12';
+const CACHE = 'gym-v13';
 const APP_FILES = ['./', 'index.html', 'style.css', 'fonts.css', 'fonts/anton-1Ptgg87LROyAm3Kz-C8.woff2', 'fonts/anton-1Ptgg87LROyAm3K9-C8QSw.woff2', 'fonts/anton-1Ptgg87LROyAm3K8-C8QSw.woff2', 'plan.js', 'app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

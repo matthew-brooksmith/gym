@@ -88,3 +88,26 @@ test('nutrition', () => {
   assert.strictEqual(n.proteinLow, 128);
   assert.ok(n.leanGain > n.maintenance);
 });
+
+test('any day can be picked, drafts are kept per day, and the order resumes after the day done', () => {
+  let s = P.defaultState();
+  s = P.selectDay(s, 3);
+  assert.strictEqual(P.currentDay(s), 'Upper B');
+  const d = P.addExercise(P.draftFor(s), s, 'Curl');
+  d.entries[0].sets[0] = { kg: 12, reps: 10 };
+  s = Object.assign({}, s, { drafts: { [d.day]: d } });
+  s = P.selectDay(s, 1);
+  assert.deepStrictEqual(P.draftFor(s).entries, []);
+  s = P.selectDay(s, 3);
+  assert.strictEqual(P.draftFor(s).entries[0].sets[0].kg, 12);
+  s = P.finishSession(s, P.draftFor(s));
+  assert.strictEqual(P.currentDay(s), 'Legs A');
+  assert.ok(!s.drafts['Upper B']);
+  assert.strictEqual(P.selectDay(s, 9), s);
+});
+
+test('an old single draft becomes that day\'s draft', () => {
+  const s = P.migrate({ version: 2, days: ['Push', 'Pull'], dayIndex: 1, history: [], draft: { day: 'Pull', dayIndex: 1, entries: [{ name: 'Row', sets: [{ kg: 50, reps: 8 }] }] } });
+  assert.strictEqual(s.draft, undefined);
+  assert.strictEqual(P.draftFor(s).entries[0].name, 'Row');
+});

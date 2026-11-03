@@ -6,7 +6,7 @@ A simple workout tracker: days in a fixed order, any exercises you like, and the
 
 Open `index.html` in a browser, or use the published copy at https://claude.ai/artifact/CTTfEFqGU4uVQSY3YKejSs (saves to your claude.ai account, so it works across devices).
 
-- **Today** is the next day in the rotation. It starts with the exercises you did last time on that day. Add more from **Previous exercises** or type a new one. Each exercise has kg and reps boxes per set (greyed hints show last time), **+ Set**, a 2:00 rest timer that starts when you enter reps, and a YouTube **Help** search. **Finish workout** saves the session and moves to the next day.
+- **Today** offers the next day in the order, but tap any day at the top to train that one instead (unfinished days keep their entries, marked with a dot). It starts with the exercises you did last time on that day. Add more from **Previous exercises** or type a new one. Each exercise has kg and reps boxes per set (greyed hints show last time), **+ Set**, a 2:00 rest timer that starts when you enter reps, and a YouTube **Help** search. **Finish workout** saves the session and moves to the next day.
 - **Lifts** lists every exercise with its last session and heaviest set.
 - **Me** holds body mass and height (BMI, protein, optional calorie estimate), the day order (one per line), history, backup and erase.
 
